@@ -1,11 +1,11 @@
 import pandas as pd
 
 
-urls = {'nonresp_tumor': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRZhXPauZjX2eeTFy-u0T0fDAuj0NKVfIRHpmCExvEIf9q8CRrun-owAdiwgaUuIEoXIU8ePuz3u558/pub?gid=495047546&single=true&output=csv',
-'resp_tumor': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRZhXPauZjX2eeTFy-u0T0fDAuj0NKVfIRHpmCExvEIf9q8CRrun-owAdiwgaUuIEoXIU8ePuz3u558/pub?gid=1172511086&single=true&output=csv',
-'resp_touchingtumor': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRZhXPauZjX2eeTFy-u0T0fDAuj0NKVfIRHpmCExvEIf9q8CRrun-owAdiwgaUuIEoXIU8ePuz3u558/pub?gid=2059489507&single=true&output=csv',
-'resp_rand': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRZhXPauZjX2eeTFy-u0T0fDAuj0NKVfIRHpmCExvEIf9q8CRrun-owAdiwgaUuIEoXIU8ePuz3u558/pub?gid=2050640054&single=true&output=csv',
-'normal':'https://docs.google.com/spreadsheets/d/e/2PACX-1vRZhXPauZjX2eeTFy-u0T0fDAuj0NKVfIRHpmCExvEIf9q8CRrun-owAdiwgaUuIEoXIU8ePuz3u558/pub?gid=1144547897&single=true&output=csv'}
+urls = {'_nonresponder_tumor': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRZhXPauZjX2eeTFy-u0T0fDAuj0NKVfIRHpmCExvEIf9q8CRrun-owAdiwgaUuIEoXIU8ePuz3u558/pub?gid=495047546&single=true&output=csv',
+'_responder_tumor': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRZhXPauZjX2eeTFy-u0T0fDAuj0NKVfIRHpmCExvEIf9q8CRrun-owAdiwgaUuIEoXIU8ePuz3u558/pub?gid=1172511086&single=true&output=csv',
+'_responder_touching': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRZhXPauZjX2eeTFy-u0T0fDAuj0NKVfIRHpmCExvEIf9q8CRrun-owAdiwgaUuIEoXIU8ePuz3u558/pub?gid=2059489507&single=true&output=csv',
+'_responder_random': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRZhXPauZjX2eeTFy-u0T0fDAuj0NKVfIRHpmCExvEIf9q8CRrun-owAdiwgaUuIEoXIU8ePuz3u558/pub?gid=2050640054&single=true&output=csv',
+'_normal':'https://docs.google.com/spreadsheets/d/e/2PACX-1vRZhXPauZjX2eeTFy-u0T0fDAuj0NKVfIRHpmCExvEIf9q8CRrun-owAdiwgaUuIEoXIU8ePuz3u558/pub?gid=1144547897&single=true&output=csv'}
 
 def store_ranges():
     ranges = {}
