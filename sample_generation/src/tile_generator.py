@@ -2,11 +2,11 @@ import pandas as pd
 import numpy as np
 import collections
 from get_tiling_ranges import store_ranges
+import os
+
 
 class TileSample:
-    """A tile sample generator:
-        - Vectorize the raw text into features.
-        - Fit a naive bayes model to the resulting features.
+    """A tile sample generator
     """
     def __init__(self):
         #sample_type: ['normal', 'nonresponder', 'responder']
@@ -17,6 +17,7 @@ class TileSample:
         self.tumor_region = None
         self.tumor_info = None
         self.gene_arrays = None
+        self.ranges = self.load_ranges()
 
     def generate_sample(self, sample_type=None):
         if sample_type == None:
@@ -42,3 +43,16 @@ class TileSample:
         self.tumor_region = (heatmap>tumor_info['thresh']).astype(int)
         tumor_info['size'] = self.tumor_region.sum()
         self.tumor_info = tumor_info
+
+    def generate_normal(self):
+        normal_ranges = ranges['normal']
+        normal = np.random.normal(loc = low, high = high, size = (9, 10))
+        return normal
+
+    def load_ranges(self):
+        files = ['../data/ranges/'+f for f in os.listdir('../data/ranges/') if f.split('.')[-1]=='csv']
+        ranges = {f.split('.csv')[0].split('/')[-1]: pd.read_csv(f) for f in files}
+        return ranges
+
+if __name__=='__main__':
+    sample = TileSample()

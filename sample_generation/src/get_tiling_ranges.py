@@ -10,5 +10,5 @@ urls = {'nonresp_tumor': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRZhXP
 def store_ranges():
     ranges = {}
     for data_type, url in urls.items():
-        df = pd.read_csv(url, encoding = 'utf8')
+        df = pd.read_csv(url, index_col = 0, encoding = 'utf8')
         df.to_csv('../data/ranges/'+data_type + '.csv')
