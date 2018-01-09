@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import collections
+from get_tiling_ranges import store_ranges
 
 class TileSample:
     """A tile sample generator:
