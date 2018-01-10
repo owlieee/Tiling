@@ -3,7 +3,7 @@ import numpy as np
 import collections
 from get_tiling_ranges import store_ranges
 import os
-
+import pdb
 
 class TileSample:
     """
@@ -22,7 +22,7 @@ class TileSample:
         self.tumor_region = None
         self.tumor_info = None
         self.gene_arrays = {}
-        self.ranges = self.load_ranges()
+        self.ranges = self._load_ranges()
 
     def generate_sample(self, sample_type=None):
         """
@@ -31,15 +31,16 @@ class TileSample:
         sample_type: string, Default = None
         OUTPUTS: None
         """
-        self.generate_normal()
+        self._generate_normal()
         if sample_type == None:
             self.sample_type = np.random.choice( ['normal', 'nonresponder', 'responder'])
         else:
             self.sample_type = sample_type
         if sample_type != 'normal':
-            self.generate_tumor()
+            self._generate_tumor()
+            self._modify_genes()
 
-    def generate_tumor(self, p_norm = 0.5):
+    def _generate_tumor(self, p_norm = 0.25):
         """
         generates random profile of a tumor_region
         stores metadata
@@ -63,7 +64,7 @@ class TileSample:
         tumor_info['size'] = self.tumor_region.sum()
         self.tumor_info = tumor_info
 
-    def get_touching_tumor(self):
+    def _get_touching_tumor(self):
         """
         returns binary array where 1 = touching tumor cell
         INPUTS: None
@@ -79,41 +80,68 @@ class TileSample:
         for row in rowShifts:
             for col in colShifts:
                 t_edge.update(zip(row, col))
-        t_edge = zip(*list(t_edge-t_coord))
+        t_edge = [edge for edge in zip(*list(t_edge-t_coord))]
         touch_array = np.zeros(tumor_region.shape)
         touch_array[t_edge] = 1
         return touch_array
 
-    def generate_normal(self):
+    def _generate_normal(self):
         """
+        Generate gene arrays with normal gene concentrations
         INPUT: None
         OUTPUT: None
         """
-        normal_ranges = self.ranges['normal']
+        normal_ranges = self.ranges['_normal']
         for ix, row in normal_ranges.iterrows():
             self.gene_arrays.update({row['gene']: np.random.normal(loc = row['mean'], scale = row['std'], size = (9, 10))})
 
-    def modify_genes(self):
-        update_map = {'tumor': update_tumor, 'random', update_random, 'touching': update_touching}
-        for data_type, ranges in self.ranges:
-            if '_' + self.sample_type in data_type:
-                update_function = update_map[data_type.split('_')[-1]]
-                d = data_type
-                self.modify(data_type)
+    def _modify_genes(self):
+        """
+        modify genes according to rules for sample_type
+        INPUT: None
+        OUTPUT: None
+        """
+        if self.sample_type == 'nonresponder':
+            self._update_region(ranges = self.ranges['_nonresponder_tumor'])
+        else:
+            self._update_region(ranges = self.ranges['_responder_tumor'])
+            self._update_region(ranges = self.ranges['_responder_random'], region =  'random')
+            self._update_region(ranges = self.ranges['_responder_touching'], region = 'touching')
 
-    def update_tumor(self):
-        pass
+    def _update_region(self, ranges = None, region = 'tumor', p_change = .11):
+        """
+        update genes in ranges dataframe to new ranges given region
+        INPUT:
+        ranges: dataframe
+        region: string
+        p_chage: float
+        OUTPUT: None
+        """
+        if region == 'tumor':
+            update = self.tumor_region
+        elif region == 'touching':
+            update = self._get_touching_tumor()
+        else:
+            update = np.random.choice(2, size = (9, 10), p = [1-p_change, p_change])
+        update_ind = np.where(update)
+        for ix, row in ranges.iterrows():
+            gene_array = self.gene_arrays[row['gene']]
+            mod_array = np.random.normal(loc = row['mean'], scale = row['std'], size = (9, 10))
+            gene_array[update_ind] = mod_array[update_ind]
+            self.gene_arrays.update({row['gene']: gene_array})
 
-    def update_random(self):
-        pass
-
-    def update_touching(self):
-        pass
-
-    def load_ranges(self):
+    def _load_ranges(self):
+        """
+        load range data from csvs
+        INPUT: None
+        OUTPUT: dictionary
+        """
         files = ['../data/ranges/'+f for f in os.listdir('../data/ranges/') if f.split('.')[-1]=='csv']
         ranges = {f.split('.csv')[0].split('/')[-1]: pd.read_csv(f) for f in files}
         return ranges
 
 if __name__=='__main__':
     sample = TileSample()
+    sample.generate_sample(sample_type = 'responder')
+
+#look up tgen
