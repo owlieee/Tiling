@@ -108,7 +108,7 @@ class TileSample:
         """
         for ix, row in self.ranges['_normal'].iterrows():
             gene_array = np.random.normal(loc = row['mean'], scale = row['std'], size = (9, 10))
-            self._store_summary_stats(row['gene'], 'normal', gene_array )
+            #self._store_summary_stats(row['gene'], 'normal', gene_array )
             self.gene_arrays.update({row['gene']: gene_array})
 
     def _modify_genes(self):
@@ -177,7 +177,7 @@ class TileSample:
             mod_array = np.random.normal(loc = gene_range['mean'], scale = gene_range['std'], size = (9, 10))
             gene_array[update_ind] = mod_array[update_ind]
             self.gene_arrays.update({gene_range['gene']: gene_array})
-            self._store_summary_stats(gene_range['gene'], region, mod_array[update_ind])
+            #self._store_summary_stats(gene_range['gene'], region, mod_array[update_ind])
             if region == 'random': #reset random region
                 update_ind = self._get_update_ind(region)
 
