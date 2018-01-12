@@ -12,3 +12,6 @@ def store_ranges():
     for data_type, url in urls.items():
         df = pd.read_csv(url, index_col = 0, encoding = 'utf8')
         df.to_csv('../data/ranges/'+data_type + '.csv')
+
+if __name__ == '__main__':
+    store_ranges()
