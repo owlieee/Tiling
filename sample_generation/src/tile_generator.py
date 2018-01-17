@@ -45,6 +45,55 @@ class TileSample:
             self._generate_tumor()
             self._modify_genes()
 
+        self._calculate_signal_purity()
+
+    def _calculate_signal_purity(self):
+        """
+        calculate signal purity based on how many samples were changed as expected
+        INPUTS: None
+        OUTPUTS: None
+        """
+        normal_pct = self._calculate_normal_pct()
+        if self.sample_type =='normal':
+            self.sample_info['signal_purity'] = normal_pct
+        elif self.sample_type == 'nonresponder':
+            num_normal = np.product(self._array_size) - self.sample_info['tumor_size']
+            normal_weight = num_normal * normal_pct
+            tumor_weight = self._calculate_tumor_weight()
+            self.sample_info['signal_purity'] = (normal_purity + tumor_weight)/np.product(self._array_size)
+        else:
+            num_normal = np.product(self._array_size) - self.sample_info['tumor_size'] - self.sample_info['touching_tumor_size']
+            normal_weight = num_normal * normal_pct
+            tumor_weight = self._calculate_tumor_weight()
+            touching_tumor_weight = self._calculate_touching_tumor_weight()
+            self.sample_info['signal_purity'] = (normal_weight + \
+                        tumor_weight + \
+                        touching_tumor_weight)/np.product(self._array_size)
+
+    def _calculate_touching_tumor_weight(self):
+        """
+        helper function for calculating percent of signal in tumor region
+        """
+        touching_tumor_changes = self.sample_info['gene_ranges'].loc[self.sample_info['gene_ranges']['region']=='touching_tumor'][['gene', 'num_changed']]
+        if len(touching_tumor_changes)>0:
+            touching_tumor_pct = np.mean(touching_tumor_changes['num_changed']/self.sample_info['touching_tumor_size'])
+        return touching_tumor_pct*self.sample_info['touching_tumor_size']
+
+    def _calculate_tumor_weight(self):
+        tumor_changes = self.sample_info['gene_ranges'].loc[self.sample_info['gene_ranges']['region']=='tumor'][['gene', 'num_changed']]
+        if len(tumor_changes)>0:
+            tumor_pct = np.mean(tumor_changes['num_changed']/self.sample_info['tumor_size'])
+        return tumor_pct*self.sample_info['tumor_size']
+
+    def _calculate_normal_pct(self):
+        if len(self.sample_info['gene_ranges'])>0:
+            normal_changes = self.sample_info['gene_ranges'].loc[self.sample_info['gene_ranges']['region']=='normal_outlier'][['gene', 'num_changed']]
+            if len(normal_changes)>0:
+                n = normal_changes.merge(self.ranges['normal'][['gene', 'prob_outlier']], how = 'outer').fillna(0)
+                normal_pct = np.mean((90-n['num_changed'])/90.)
+        else:
+            normal_pct = 1
+        return normal_pct
 
     def _generate_tumor(self, size = None):
         """
@@ -207,7 +256,7 @@ class TileSample:
         """
         change_ranges = self.ranges['changes'].loc[self.ranges['changes']['sample_type']==self.sample_type]
         for region in change_ranges['region'].unique():
-            self._update_region(ranges = change_ranges, region = region)
+            self._update_region(ranges = change_ranges.loc[change_ranges['region']==region], region = region)
 
     def _store_summary_stats(self, gene, region, gene_array):
         if len(self.sample_info['gene_ranges'])==0:
@@ -255,7 +304,7 @@ class TileSample:
             update_ind = expected_update_ind
         else:
             a = np.zeros(self._array_size)
-            a[ind] = 1
+            a[expected_update_ind] = 1
             update_ind = np.where(a*self._get_random_ind())
         return update_ind
 
@@ -270,21 +319,17 @@ class TileSample:
         OUTPUT: None
         """
         #outside for loop to avoid repeat calls for tumor and touching tumor regions
-        if region != 'random':
-            expected_update_ind = self._get_update_ind(region)
+        expected_update_ind = self._get_update_ind(region)
 
         for ix, gene_info in ranges.iterrows():
+            #randomly sparsify with probability gene_info['prob_changes']
+            update_ind = self._randomly_sparse_ind(expected_update_ind, gene_info['prob_change'])
+            mod_array = np.random.normal(loc = gene_info['mean'], scale = gene_info['std'], size = (9, 10))
+            self.gene_arrays[gene_info['gene']][update_ind] = mod_array[update_ind]
+            self._store_summary_stats(gene_info['gene'], region, mod_array[update_ind])
             if region == 'random':
                 #always reset for random region
-                update_ind = self._get_update_ind(region)
-            else:
-                #randomly sparsify with probability gene_info['prob_changes']
-                update_ind = self._randomly_sparse_ind(expected_update_ind, gene_info['prob_change'])
-            gene_array = self.gene_arrays[gene_range['gene']]
-            mod_array = np.random.normal(loc = gene_range['mean'], scale = gene_range['std'], size = (9, 10))
-            gene_array[update_ind] = mod_array[update_ind]
-            self.gene_arrays.update({gene_range['gene']: gene_array})
-            self._store_summary_stats(gene_range['gene'], region, mod_array[update_ind])
+                expected_update_ind = self._get_update_ind(region)
 
 
 
