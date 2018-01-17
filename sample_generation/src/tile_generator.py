@@ -156,7 +156,7 @@ class TileSample:
         return shifted_coord
 
 
-    def _get_random_ind(self, p_change = 0.11):
+    def _get_random_ind(self, p_change = None):
         """
         randomly set indices to 1 or 0 in 9x10 array, p(1) = p_change
         INPUT:
@@ -164,6 +164,8 @@ class TileSample:
         OUTPUT:
         array
         """
+        if not p_change:
+            p_change = np.clip(np.random.exponential(scale = 0.1), 1./np.product(self._array_size), 1)
         return np.random.choice(2, size = self._array_size, p = [1-p_change, p_change])
 
     def _generate_normal(self):
@@ -187,7 +189,7 @@ class TileSample:
         INPUT: None
         OUTPUT: None
         """
-        alter_ind = np.where(self._get_random_ind(p_change = min(1, np.random.exponential(scale = 0.1)))==1)
+        alter_ind = np.where(self._get_random_ind()==1)
         if len(alter_ind)>0:
             #randomly set min, max for uniform distribution to 2-5 standard deviations from mean
             uniform_min = max(gene_info['mean']-gene_info['std']*(2+2*np.random.random()), self._gene_range[0])
@@ -199,16 +201,13 @@ class TileSample:
 
     def _modify_genes(self):
         """
-        modify genes according to rules for sample_type
+        modify genes for all regions specified by sample_type
         INPUT: None
         OUTPUT: None
         """
-        if self.sample_type == 'nonresponder':
-            self._update_region(ranges=self.ranges['_nonresponder_tumor'])
-        else:
-            self._update_region(ranges = self.ranges['_responder_tumor'])
-            self._update_region(ranges = self.ranges['_responder_random'], region =  'random')
-            self._update_region(ranges = self.ranges['_responder_touching'], region = 'touching')
+        change_ranges = self.ranges['changes'].loc[self.ranges['changes']['sample_type']==self.sample_type]
+        for region in change_ranges['region'].unique():
+            self._update_region(ranges = change_ranges, region = region)
 
     def _store_summary_stats(self, gene, region, gene_array):
         if len(self.sample_info['gene_ranges'])==0:
@@ -238,31 +237,55 @@ class TileSample:
         update_ind: 9x10 array of ones and zeros
         """
         if region == 'tumor':
-            update_ind = np.where(self.tumor_region)
-        elif region == 'touching':
+            update_ind = np.where(self.tumor_region>0)
+        elif region == 'touching_tumor':
             update_ind = np.where(self._get_touching_tumor())
         elif region == 'random':
             update_ind = np.where(self._get_random_ind())
         return update_ind
 
+    def _randomly_sparse_ind(self, expected_update_ind, prob_change):
+        """
+        helper function to randomly set indices to zero
+        INPUT:
+        ind: 2d array
+        output: 2d array
+        """
+        if np.random.random()<prob_change:
+            update_ind = expected_update_ind
+        else:
+            a = np.zeros(self._array_size)
+            a[ind] = 1
+            update_ind = np.where(a*self._get_random_ind())
+        return update_ind
+
     def _update_region(self, ranges=None, region='tumor'):
         """
         update genes in ranges dataframe to new ranges given region
+        randomly sparsify the region based on prob_change
         INPUT:
         ranges: dataframe
         region: string
-        p_chage: float
+        p_change: float
         OUTPUT: None
         """
-        update_ind = self._get_update_ind(region)
-        for ix, gene_range in ranges.iterrows():
+        #outside for loop to avoid repeat calls for tumor and touching tumor regions
+        if region != 'random':
+            expected_update_ind = self._get_update_ind(region)
+
+        for ix, gene_info in ranges.iterrows():
+            if region == 'random':
+                #always reset for random region
+                update_ind = self._get_update_ind(region)
+            else:
+                #randomly sparsify with probability gene_info['prob_changes']
+                update_ind = self._randomly_sparse_ind(expected_update_ind, gene_info['prob_change'])
             gene_array = self.gene_arrays[gene_range['gene']]
             mod_array = np.random.normal(loc = gene_range['mean'], scale = gene_range['std'], size = (9, 10))
             gene_array[update_ind] = mod_array[update_ind]
             self.gene_arrays.update({gene_range['gene']: gene_array})
             self._store_summary_stats(gene_range['gene'], region, mod_array[update_ind])
-            if region == 'random': #reset random region
-                update_ind = self._get_update_ind(region)
+
 
 
 
