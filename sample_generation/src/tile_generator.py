@@ -25,6 +25,7 @@ class TileSample:
         self.gene_arrays = {}
         self.ranges = None
         self._array_size = (9,10)
+        self._gene_range = (5,40)
 
     def generate_sample(self, ranges, sample_type=None):
         """
@@ -168,13 +169,33 @@ class TileSample:
     def _generate_normal(self):
         """
         Generate gene arrays with normal gene concentrations
+        Randomly create outliers with probability set in gene info table
         INPUT: None
         OUTPUT: None
         """
-        for ix, row in self.ranges['_normal'].iterrows():
-            gene_array = np.random.normal(loc = row['mean'], scale = row['std'], size = (9, 10))
-            self._store_summary_stats(row['gene'], 'normal', gene_array )
-            self.gene_arrays.update({row['gene']: gene_array})
+
+        for ix, gene_info in self.ranges['normal'].iterrows():
+            mean = np.random.normal(loc = gene_info['mean'], scale = gene_info['std'])
+            gene_array = np.random.normal(loc = mean, scale = gene_info['std'], size = self._array_size)
+            self.gene_arrays.update({gene_info['gene']: gene_array})
+            if np.random.random()<gene_info['prob_outlier']:
+                self._set_normal_outliers(gene_info)
+
+    def _set_normal_outliers(self, gene_info):
+        """
+        Randomly generate outliers in normal gene_array with broader uniform range
+        INPUT: None
+        OUTPUT: None
+        """
+        alter_ind = np.where(self._get_random_ind(p_change = min(1, np.random.exponential(scale = 0.1)))==1)
+        if len(alter_ind)>0:
+            #randomly set min, max for uniform distribution to 2-5 standard deviations from mean
+            uniform_min = max(gene_info['mean']-gene_info['std']*(2+2*np.random.random()), self._gene_range[0])
+            uniform_max = min(gene_info['mean']+gene_info['std']*(2+2*np.random.random()), self._gene_range[1])
+            self.gene_arrays[gene_info['gene']][alter_ind] = np.random.uniform(uniform_min,
+                                                                               uniform_max,
+                                                                               size = self._array_size)[alter_ind]
+            self._store_summary_stats(gene_info['gene'], 'normal_outlier', self.gene_arrays[gene_info['gene']][alter_ind])
 
     def _modify_genes(self):
         """
