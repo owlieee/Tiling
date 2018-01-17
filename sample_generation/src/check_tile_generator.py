@@ -21,7 +21,7 @@ def test_generate_tumor():
         else:
             generated_actual = False
             set_size = sample.sample_info['tumor_size']
-            actual_size =  np.sum(sample.tumor_region)
+            actual_size =  np.sum(sample.tumor_region>0)
             message_size = sample_type + ' sample, tumor size should be %d: Got %d' \
                       % (set_size, actual_size)
             n.ok_((n.assert_equal(set_size, actual_size), message_size))
@@ -29,7 +29,26 @@ def test_generate_tumor():
         n.assert_equal(generated, generated_actual, message1)
 
 
-# def test_touching_tumor():
-#     sample = tg.TileSample()
-#     sample.generate_sample(ranges, sample_type='responder')
-#     _get_tumor_heatmap
+def test_touching_tumor():
+    sample = tg.TileSample()
+    sample.generate_sample(ranges, sample_type='responder')
+    sample.tumor_region = np.array( [[ 0.,  0.,  0.,  0.,  0.,  0.,  0.,  0.,  0.,  0.],
+                               [ 0.,  0.,  0.,  1.,  2.,  3.,  0.,  0.,  0.,  0.],
+                               [ 0.,  0.,  0.,  1.,  1.,  5.,  1.,  0.,  0.,  0.],
+                               [ 0.,  0.,  0.,  0.,  0.,  1.,  0.,  0.,  0.,  0.],
+                               [ 0.,  0.,  0.,  0.,  1.,  1.,  1.,  0.,  0.,  0.],
+                               [ 0.,  0.,  0.,  0.,  2.,  4.,  2.,  0.,  0.,  0.],
+                               [ 0.,  0.,  0.,  0.,  2.,  2.,  2.,  0.,  0.,  0.],
+                               [ 0.,  0.,  0.,  0.,  0.,  0.,  0.,  0.,  0.,  0.],
+                               [ 0.,  0.,  0.,  0.,  0.,  0.,  0.,  0.,  0.,  0.]])
+    actual = sample._get_touching_tumor()
+    correct = np.array(  [[ 0.,  0.,  1.,  1.,  1.,  1.,  1.,  0.,  0.,  0.],
+                       [ 0.,  0.,  1.,  0.,  0.,  0.,  1.,  1.,  0.,  0.],
+                       [ 0.,  0.,  1.,  0.,  0.,  0.,  0.,  1.,  0.,  0.],
+                       [ 0.,  0.,  1.,  1.,  1.,  0.,  1.,  1.,  0.,  0.],
+                       [ 0.,  0.,  0.,  1.,  0.,  0.,  0.,  1.,  0.,  0.],
+                       [ 0.,  0.,  0.,  1.,  0.,  0.,  0.,  1.,  0.,  0.],
+                       [ 0.,  0.,  0.,  1.,  0.,  0.,  0.,  1.,  0.,  0.],
+                       [ 0.,  0.,  0.,  1.,  1.,  1.,  1.,  1.,  0.,  0.],
+                       [ 0.,  0.,  0.,  0.,  0.,  0.,  0.,  0.,  0.,  0.]])
+    n.assert_true((actual ==correct).all())

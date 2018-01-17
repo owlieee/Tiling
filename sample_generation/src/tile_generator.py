@@ -56,11 +56,7 @@ class TileSample:
 
         #generate tumor heatmap from randomly selected attributes
         self._set_random_tumor_attributes(size = size)
-        tumor_heatmap = self._get_tumor_heatmap()
-
-        #set cells > 1 as tumor (1), cells = 1 as partial tumor (0.5)
-        self.tumor_region = (tumor_heatmap>0).astype(float)
-        #self.tumor_region[np.where(tumor_heatmap==1)]= 0.5
+        self._set_tumor_heatmap()
 
 
     def _set_random_tumor_attributes(self, size = None):
@@ -72,10 +68,9 @@ class TileSample:
         array_area = np.product(self._array_size)
 
         if size is None:
-            self.sample_info['tumor_size'] = float(np.round(np.random.uniform(1,array_area-1)))
+            self.sample_info['tumor_size'] = float(np.floor(np.random.uniform(1,array_area)))
         else:
             self.sample_info['tumor_size'] = float(size)
-
 
         self.sample_info['tumor_percent'] = 100*self.sample_info['tumor_size']/float(array_area)
 
@@ -84,25 +79,23 @@ class TileSample:
         self.sample_info['tumor_type'] = {'x_dist': tumor_type_map[np.random.random() < 0.5],
                                          'y_dist' : tumor_type_map[np.random.random() < 0.5]}
 
-    def _get_tumor_heatmap(self):
+    def _set_tumor_heatmap(self):
         """
         use tumor attributes to generate tumor heatmap that covers set percentage
-        of array area
+        of array area. store as tumor_region
         INPUTS: None
-        OUTPUTS: heatmap: 2d array shape = (9,10)
+        OUTPUTS: None
         """
         #generate random x and y arrays from preselected distributions
         n_samples = 100
         x = self.sample_info['tumor_type']['x_dist'](n_samples)
         y = self.sample_info['tumor_type']['y_dist'](n_samples)
         #generate 2d histogram from x and y arrays
-        heatmap, _, _ = np.histogram2d(x, y, bins= self._array_size)
+        self.tumor_region, _, _ = np.histogram2d(x, y, bins= self._array_size)
         #randomly increase other indices to achieve sample size
-        heatmap = heatmap + np.random.random(self._array_size)
-        thresh = np.percentile(heatmap, 100-self.sample_info['tumor_percent'])
-        heatmap[heatmap<=thresh]=0
-        return heatmap
-
+        self.tumor_region = self.tumor_region + np.random.random(self._array_size)
+        thresh = np.percentile(self.tumor_region, 100-self.sample_info['tumor_percent'])
+        self.tumor_region[self.tumor_region<=thresh]=0
 
     def _get_touching_tumor(self):
         """
