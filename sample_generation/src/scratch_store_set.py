@@ -29,6 +29,7 @@ for i in range(0,n_samples):
     X[i] = np.dstack(g.values()[0:13])[:, :, :]
     y[i] = type_map[sample.sample_type]
 
+
 import cPickle as pickle
 test_data = {'X': X, 'y': y}
 myfile = open('../data/test_data.pickle', 'wb')

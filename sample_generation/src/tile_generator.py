@@ -24,6 +24,7 @@ class TileSample:
         self.tumor_region = None
         self.gene_arrays = {}
         self.ranges = None
+        self._array_size = (9,10)
 
     def generate_sample(self, ranges, sample_type=None):
         """
@@ -39,56 +40,127 @@ class TileSample:
         else:
             self.sample_type = sample_type
 
-        if sample_type != 'normal':
+        if self.sample_type != 'normal':
             self._generate_tumor()
             self._modify_genes()
 
-    def _generate_tumor(self, p_norm = 0.5):
+
+    def _generate_tumor(self, size = None):
         """
-        generates random profile of a tumor_region
+        generates random profile of a tumor_region.
+        Optional input size to set number of tumor cells
         stores metadata
-        INPUTS:
-        p_norm: float, probability of clustered tumor vs. scattered
+        INPUTS: size: int
         OUTPUTS: None
         """
 
-        n_samples = max(10, int(np.random.normal(loc = 120, scale = 20)))
-        generator_map = {True: np.random.randn, False: np.random.rand}
-        tumor_type_map = {True: {True: 'normal', False: 'random_y'}, False: {True: 'random_x', False: 'random_xy'}}
+        #generate tumor heatmap from randomly selected attributes
+        self._set_random_tumor_attributes(size = size)
+        tumor_heatmap = self._get_tumor_heatmap()
 
-        x_type = np.random.random() < np.sqrt(p_norm)
-        y_type = np.random.random() < np.sqrt(p_norm)
+        #set cells > 1 as tumor (1), cells = 1 as partial tumor (0.5)
+        self.tumor_region = (tumor_heatmap>0).astype(float)
+        #self.tumor_region[np.where(tumor_heatmap==1)]= 0.5
 
-        x = generator_map[x_type](n_samples)
-        y = generator_map[y_type](n_samples)
-        heatmap, xedges, yedges = np.histogram2d(x, y, bins=(9,10))
-        self.sample_info['tumor_type'] = tumor_type_map[x_type][y_type]
-        self.sample_info['thresh'] = heatmap.mean()#np.random.normal(loc = heatmap.mean(), scale = heatmap.std()/2.)
-        self.sample_info['n_samples'] = n_samples
-        self.tumor_region = (heatmap>self.sample_info['thresh']).astype(int)
-        self.sample_info['tumor_size'] = self.tumor_region.sum()
+
+    def _set_random_tumor_attributes(self, size = None):
+        """
+        randomly choose attributes for tumor generation with optional input "size"
+        INPUTS: size: int or None
+        OUTPUTS: None
+        """
+        array_area = np.product(self._array_size)
+
+        if size is None:
+            self.sample_info['tumor_size'] = float(np.round(np.random.uniform(1,array_area-1)))
+        else:
+            self.sample_info['tumor_size'] = float(size)
+
+
+        self.sample_info['tumor_percent'] = 100*self.sample_info['tumor_size']/float(array_area)
+
+        #randomly choose normal or random distribution for x and y
+        tumor_type_map = {True: np.random.randn, False: np.random.rand}
+        self.sample_info['tumor_type'] = {'x_dist': tumor_type_map[np.random.random() < 0.5],
+                                         'y_dist' : tumor_type_map[np.random.random() < 0.5]}
+
+    def _get_tumor_heatmap(self):
+        """
+        use tumor attributes to generate tumor heatmap that covers set percentage
+        of array area
+        INPUTS: None
+        OUTPUTS: heatmap: 2d array shape = (9,10)
+        """
+        #generate random x and y arrays from preselected distributions
+        n_samples = 100
+        x = self.sample_info['tumor_type']['x_dist'](n_samples)
+        y = self.sample_info['tumor_type']['y_dist'](n_samples)
+        #generate 2d histogram from x and y arrays
+        heatmap, _, _ = np.histogram2d(x, y, bins= self._array_size)
+        #randomly increase other indices to achieve sample size
+        heatmap = heatmap + np.random.random(self._array_size)
+        thresh = np.percentile(heatmap, 100-self.sample_info['tumor_percent'])
+        heatmap[heatmap<=thresh]=0
+        return heatmap
+
 
     def _get_touching_tumor(self):
         """
-        returns binary array where 1 = touching tumor cell
+        returs binary array where 1 = touching tumor cell
         INPUTS: None
-        OUTPUTS: 2 dimensional array
+        OUTPUTS: touching_array: 2 dimensional array
         """
-        tumor_region = self.tumor_region
-        t = np.where(tumor_region==1)
-        t_coord = set(zip(t[0], t[1]))
-        rowBound, colBound = (tumor_region.shape[0] - 1, tumor_region.shape[1] - 1)
-        rowShifts = [t[0], np.clip(t[0]+1, 0, rowBound), np.clip(t[0]-1, 0, rowBound)]
-        colShifts = [t[1], np.clip(t[1]+1, 0, colBound), np.clip(t[1]-1, 0, colBound)]
-        t_edge = set()
-        for row in rowShifts:
-            for col in colShifts:
-                t_edge.update(zip(row, col))
-        t_edge = [edge for edge in zip(*list(t_edge-t_coord))]
-        touch_array = np.zeros(tumor_region.shape)
-        touch_array[t_edge] = 1
-        self.sample_info['touching_tumor_size'] = np.sum(touch_array)
-        return touch_array
+        touching_ind = self._get_touching_ind()
+        touching_array = np.zeros(self.tumor_region.shape)
+        touching_array[touching_ind] = 1
+        #store metadata
+        self.sample_info['touching_tumor_size'] = np.sum(touching_array)
+        return touching_array
+
+    def _get_touching_ind(self):
+        """
+        get list of coordinates for all cells touching tumor, including diagonals,
+        not including tumor coordinates
+        INPUTS: None
+        OUTPUTS: touching_ind: list, contains x and y indices
+        """
+        tumor_row_ind, tumor_col_ind = np.where(self.tumor_region>0)
+
+        #get coordinates for all cells up/down/left/right/diagonal of tumor.
+        #may overlap with tumor
+        shifted_coord = self._get_shifted_coord(tumor_row_ind, tumor_col_ind)
+        tumor_coord = set(zip(tumor_row_ind, tumor_col_ind))
+        #remove coordinates that are also tumor cells
+        touching_coord = list(shifted_coord -tumor_coord)
+        #format indices properly for array indexing
+        touching_ind = [edge for edge in zip(*touching_coord)]
+        return touching_ind
+
+    def _get_shifted_coord(self, tumor_row_ind, tumor_col_ind):
+        """
+        get list of tumor row and column indices, normal, shifted up
+        and shifted down, clipped to not exceed valid indices for array size
+        INPUT: tumor_row_ind: 1d array
+               tumor_col_ind: 1d array
+        OUTPUT: coord_shifts: set
+        """
+        row_bound, col_bound = (self._array_size[0] - 1, self._array_size[1] - 1)
+        #list of all row indices and adjacent to row indices (right and left)
+        row_shifts = [tumor_row_ind,
+                    np.clip(tumor_row_ind+1, 0, row_bound),
+                    np.clip(tumor_row_ind-1, 0, row_bound)]
+        #list of all col indices and adjacent to col indices (above and below)
+        col_shifts = [tumor_col_ind,
+                    np.clip(tumor_col_ind+1, 0, col_bound),
+                    np.clip(tumor_col_ind-1, 0, col_bound)]
+        #nested for loop finds all indices left, right, up, down and diagonal
+        #to original tumor_row_ind and tumor_col_ind, clipped to array_size
+        shifted_coord = set()
+        for row in row_shifts:
+            for col in col_shifts:
+                shifted_coord.update(zip(row, col))
+        return shifted_coord
+
 
     def _get_random_ind(self, p_change = 0.11):
         """
@@ -98,7 +170,7 @@ class TileSample:
         OUTPUT:
         array
         """
-        return np.random.choice(2, size = (9, 10), p = [1-p_change, p_change])
+        return np.random.choice(2, size = self._array_size, p = [1-p_change, p_change])
 
     def _generate_normal(self):
         """
@@ -108,7 +180,7 @@ class TileSample:
         """
         for ix, row in self.ranges['_normal'].iterrows():
             gene_array = np.random.normal(loc = row['mean'], scale = row['std'], size = (9, 10))
-            #self._store_summary_stats(row['gene'], 'normal', gene_array )
+            self._store_summary_stats(row['gene'], 'normal', gene_array )
             self.gene_arrays.update({row['gene']: gene_array})
 
     def _modify_genes(self):
@@ -125,27 +197,24 @@ class TileSample:
             self._update_region(ranges = self.ranges['_responder_touching'], region = 'touching')
 
     def _store_summary_stats(self, gene, region, gene_array):
-        try:
-            if len(self.sample_info['gene_ranges'])==0:
-                self.sample_info['gene_ranges'] = pd.DataFrame()
-            if len(gene_array)==0:
-                self.sample_info['gene_ranges'] = self.sample_info['gene_ranges'].append(
-                                                    pd.Series({'gene': gene,
-                                                    'region': region,
-                                                    'num_changed': len(gene_array.flatten())})
-                                                        , ignore_index = True)
-            else:
-                self.sample_info['gene_ranges'] = self.sample_info['gene_ranges'].append(
-                                                    pd.Series({'gene': gene,
-                                                    'region': region,
-                                                    'num_changed': len(gene_array.flatten()),
-                                                    'array': gene_array.flatten(),
-                                                    'mean': np.mean(gene_array),
-                                                    'std': np.std(gene_array),
-                                                    'min': np.min(gene_array),
-                                                    'max': np.max(gene_array)}), ignore_index = True)
-        except:
-            pdb.set_trace()
+        if len(self.sample_info['gene_ranges'])==0:
+            self.sample_info['gene_ranges'] = pd.DataFrame()
+        if len(gene_array)==0:
+            self.sample_info['gene_ranges'] = self.sample_info['gene_ranges'].append(
+                                                pd.Series({'gene': gene,
+                                                'region': region,
+                                                'num_changed': len(gene_array.flatten())})
+                                                    , ignore_index = True)
+        else:
+            self.sample_info['gene_ranges'] = self.sample_info['gene_ranges'].append(
+                                                pd.Series({'gene': gene,
+                                                'region': region,
+                                                'num_changed': len(gene_array.flatten()),
+                                                'mean': np.mean(gene_array),
+                                                'std': np.std(gene_array),
+                                                'min': np.min(gene_array),
+                                                'max': np.max(gene_array)}), ignore_index = True)
+
     def _get_update_ind(self, region):
         """
         find indices to update based on region
@@ -177,7 +246,7 @@ class TileSample:
             mod_array = np.random.normal(loc = gene_range['mean'], scale = gene_range['std'], size = (9, 10))
             gene_array[update_ind] = mod_array[update_ind]
             self.gene_arrays.update({gene_range['gene']: gene_array})
-            #self._store_summary_stats(gene_range['gene'], region, mod_array[update_ind])
+            self._store_summary_stats(gene_range['gene'], region, mod_array[update_ind])
             if region == 'random': #reset random region
                 update_ind = self._get_update_ind(region)
 
@@ -198,7 +267,3 @@ if __name__=='__main__':
     ranges = load_ranges()
     sample = TileSample()
     sample.generate_sample(ranges)
-
-#look up tgen
-
-#next step-- generate 100 of each, implement histograms for data quality check.

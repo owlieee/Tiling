@@ -62,9 +62,9 @@ for gene in normal_ranges['gene'].unique():
         ax.axvline(x = nonresp_row['max'].values[0], color = 'red', alpha = 0.5,linestyle = '--')
     ax.legend()
     ax.set_title(gene + " Concentrations")
-    plt.savefig('../figures/gene_concentrations/'+gene + '.png')
-    #fig.show()
-    plt.close('all')
+    #plt.savefig('../figures/gene_concentrations/'+gene + '.png')
+    fig.show()
+    #plt.close('all')
 
 
 touching_ranges = ranges['_responder_touching']
