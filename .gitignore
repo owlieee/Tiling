@@ -36,4 +36,6 @@
 ehthumbs.db
 Thumbs.db
 
+config.json
+
 __pycache__/

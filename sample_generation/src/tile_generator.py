@@ -60,7 +60,7 @@ class TileSample:
             num_normal = np.product(self._array_size) - self.sample_info['tumor_size']
             normal_weight = num_normal * normal_pct
             tumor_weight = self._calculate_tumor_weight()
-            self.sample_info['signal_purity'] = (normal_purity + tumor_weight)/np.product(self._array_size)
+            self.sample_info['signal_purity'] = (normal_weight + tumor_weight)/np.product(self._array_size)
         else:
             num_normal = np.product(self._array_size) - self.sample_info['tumor_size'] - self.sample_info['touching_tumor_size']
             normal_weight = num_normal * normal_pct

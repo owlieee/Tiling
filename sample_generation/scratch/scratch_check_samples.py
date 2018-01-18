@@ -136,9 +136,11 @@ fig, ax = plt.subplots()
 responder['num_changed'].hist(ax = ax)
 fig.show()
 
-for i in range(0,100):
+l = []
+for i in range(0,10000):
     sample = TileSample()
     sample.generate_sample(ranges, sample_type  = 'responder')
+    l = l +  [np.sum(sample.tumor_region)/90]
     fig, ax = plt.subplots()
     ax.imshow(sample.tumor_region)
     ax.set_xticks(np.arange(0.5,10.5))
@@ -146,5 +148,6 @@ for i in range(0,100):
     ax.set_yticks(np.arange(0.5,9.5))
     ax.set_yticklabels(['1', '2', '3', '4', '5', '6', '7', '8', '9'])
     ax.set_title('Sample Tumor, yellow = Tumor')
+    fig.show()
     plt.savefig('../figures/sample_tumors/' + str(i))
     plt.close('all')
