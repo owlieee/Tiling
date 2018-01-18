@@ -7,7 +7,7 @@ from sqlalchemy import create_engine, Table, Column, Integer, String, MetaData, 
 from sqlalchemy.orm import sessionmaker
 import json
 from sqlalchemy.dialects import postgresql
-
+import time
 
 def make_numeric(value):
     if value==[]:
@@ -23,72 +23,95 @@ def make_str(value):
         y_dist = value['y_dist'].__name__
         return 'X_'+x_dist + '_Y_' + y_dist
 
-def make_sample_info_table(sample, sample_id, schema = None, if_exists = 'append'):
-    sample_df = pd.DataFrame({'sample_type': sample.sample_type,
+def make_sample_metadata(sample):
+    sample_metadata = pd.Series({'sample_type': sample.sample_type,
         'signal_purity': make_numeric(sample.sample_info['signal_purity']),
         'tumor_percent': make_numeric(sample.sample_info['tumor_percent']),
         'tumor_size': make_numeric(sample.sample_info['tumor_size']),
         'tumor_type': make_str(sample.sample_info['tumor_type']),
-        'touching_tumor_size': make_numeric(sample.sample_info['touching_tumor_size'])},
-        index = [sample_id])
-    sample_df.to_sql('sample_info',
-                     engine,
-                     if_exists=if_exists,
-                     schema = schema,
-                     index = True,
-                     index_label='sample_id')
+        'touching_tumor_size': make_numeric(sample.sample_info['touching_tumor_size'])})
+    return sample_metadata
 
-def postgres_array(numpy_array):
-    return [list(r) for r in numpy_array]
+def store_samples(df,dtypes, schema = None, if_exists = 'append'):
+    df.to_sql('samples',
+            engine,
+            if_exists = if_exists,
+            schema = schema,
+            index = False,
+            dtype = dtypes)
 
-def make_gene_table(sample, sample_id, schema = None, if_exists = 'append'):
-    dtypes = {gene: postgresql.ARRAY(postgresql.DOUBLE_PRECISION for gene in sample.gene_arrays.columns}
-    sample.gene_arrays['sample_id'] = sample_id
-    sample.gene_arrays.to_sql('gene_table',
-                    engine,
-                    if_exists = if_exists,
-                    schema = schema,
-                    index = False,
-                    dtype = dtypes)
+def get_formatted_sample_data():
+    t = time.time()
+    sample = TileSample()
+    t1 = time.time()
+    #print 1, t1-t
+    sample.generate_sample(ranges)
+    t2 = time.time()
+    #print 2, t2-t1
+    sample._convert_to_list()
+    t3 = time.time()
+    #print 3, t3-t2
+    sample_metadata = make_sample_metadata(sample)
+    t4 = time.time()
+    #print 4, t4-t3
+    sample_data = sample_metadata.append(sample.gene_arrays)
+    t5 = time.time()
+    #print 5, t5-t4
+    sample_data = sample_data.append(pd.Series({'tumor_region': sample.tumor_region}))
+    t6 = time.time()
+    #print 6, t6-t5
+    return sample_data
 
-def make_tumor_table(sample, sample_id, schema = None, if_exists = 'append'):
-    if sample.tumor_region is not None:
-        tumor_data = pd.Series({'sample_id': int(sample_id),
-                                'tumor_array': sample.tumor_region})
-        tumor_df = pd.DataFrame().append(tumor_data, ignore_index =  True)
-        tumor_df.to_sql('tumor_region',
-                        engine,
-                        if_exists = if_exists,
-                        schema = schema,
-                        index = False,
-                        dtype = {'gene_array': postgresql.ARRAY(postgresql.DOUBLE_PRECISION)})
+def init_data():
+    ranges = load_ranges()
+    dtypes = {gene: postgresql.ARRAY(postgresql.DOUBLE_PRECISION) for gene in ranges['normal']['gene'].values}
+    dtypes['tumor_region'] = postgresql.ARRAY(postgresql.DOUBLE_PRECISION)
+    return ranges, dtypes
 
-def make_all_tables(sample, sample_id, schema = None, if_exists = 'append'):
-    make_sample_info_table(sample, sample_id, schema = schema, if_exists = if_exists)
-    make_gene_tables(sample, sample_id, schema = schema, if_exists = if_exists)
-    make_tumor_table(sample, sample_id, schema = schema, if_exists = if_exists)
-
-def init_connection():
+def init_connection(schema=None):
     with open('config/config.json') as f:
         conf = json.load(f)
 
     conn_str = "postgresql://{}:{}@{}/{}".format(conf['user'],conf['passw'],conf['host'], conf['database'])
     engine = create_engine(conn_str)
-    if engine.has_table('sample_info'):
-        start_id = int(1 + pd.read_sql("SELECT sample_id FROM sample_info ORDER BY sample_id DESC limit 1", engine).iloc[0][0])
-    else:
-        start_id = int(0)
-    return engine, start_id
+    if schema is not None:
+        try:
+            engine.execute("CREATE SCHEMA "+schema)
+        except:
+            pass
+    return engine
 
-engine, start_id = init_connection()
-ranges = load_ranges()
-schema = "test"
-engine.execute("CREATE SCHEMA test")
+def get_samples(num_samples, t):
+    for i in range(0, num_samples):
+        if i%1000==0:
+            print str(i)+"/"+str(num_samples)
+            print str(time.time()-t) + "s elapsed"
+        if i == 0:
+            s = get_formatted_sample_data()
+            df = pd.DataFrame(index = np.arange(0,num_samples), columns = s.keys())
+            df.iloc[i] = s
+        else:
+            df.iloc[i] = get_formatted_sample_data()
+    return df
 
-num_samples = 10
-for sample_id in range(start_id, num_samples):
-    print sample_id
-    sample = TileSample()
-    sample.generate_sample(ranges)
-    sample.convert_to_list()
-    make_all_tables(sample, sample_id, schema = schema, if_exists = 'append')
+def reset(engine):
+    engine.execute("drop owned by owlieee")
+
+if __name__ == '__main__':
+    schema = 'test_1.0'
+    num_samples = 1000
+    print "storing " + str(num_samples) + " samples to " + schema + ".samples"
+
+    print "initializing connection..."
+    engine = init_connection(schema = schema)
+    ranges, dtypes = init_data()
+
+    t = time.time()
+    print "generating samples..."
+    df = get_samples(num_samples, t)
+
+    print "storing samples..."
+    store_samples(df, dtypes, schema = schema, if_exists = 'append')
+
+    engine.dispose()
+    print "Done! connection closed"

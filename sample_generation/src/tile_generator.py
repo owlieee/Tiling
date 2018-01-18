@@ -5,6 +5,7 @@ from collections import defaultdict
 from get_tiling_ranges import store_ranges
 import os
 import pdb
+import time
 
 class TileSample:
     """
@@ -36,6 +37,7 @@ class TileSample:
         """
         self.ranges = ranges
         self._generate_normal()
+
         if not sample_type:
             self.sample_type = np.random.choice( ['normal', 'nonresponder', 'responder'])
         else:
@@ -46,6 +48,7 @@ class TileSample:
             self._modify_genes()
 
         self._calculate_signal_purity()
+
 
     def _convert_to_list(self):
         #self.gene_arrays = pd.Series(self.gene_arrays)
