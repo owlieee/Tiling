@@ -46,15 +46,14 @@ class TileSample:
         if self.sample_type != 'normal':
             self._generate_tumor()
             self._modify_genes()
-
+        else:
+            self.tumor_region = np.zeros((9,10))
         self._calculate_signal_purity()
 
 
     def _convert_to_list(self):
-        #self.gene_arrays = pd.Series(self.gene_arrays)
         self.gene_arrays = self.gene_arrays.apply(lambda x: [list(v) for v in x])
-        if self.tumor_region is not None:
-            self.tumor_region = [list(v) for v in self.tumor_region]
+        self.tumor_region = [list(v) for v in self.tumor_region]
 
     def _calculate_signal_purity(self):
         """

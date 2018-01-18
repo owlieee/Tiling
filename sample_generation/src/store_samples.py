@@ -5,13 +5,15 @@ import matplotlib
 import numpy as np
 from sqlalchemy import create_engine, Table, Column, Integer, String, MetaData, ForeignKey
 from sqlalchemy.orm import sessionmaker
-import json
 from sqlalchemy.dialects import postgresql
+from sqlalchemy.schema import CreateSchema
+import cStringIO
+import json
 import time
 
 def make_numeric(value):
     if value==[]:
-        return np.nan
+        return 0
     else:
         return value
 
@@ -64,8 +66,8 @@ def get_formatted_sample_data():
 
 def init_data():
     ranges = load_ranges()
-    dtypes = {gene: postgresql.ARRAY(postgresql.DOUBLE_PRECISION) for gene in ranges['normal']['gene'].values}
-    dtypes['tumor_region'] = postgresql.ARRAY(postgresql.DOUBLE_PRECISION)
+    dtypes = {gene: postgresql.ARRAY(postgresql.REAL) for gene in ranges['normal']['gene'].values}
+    dtypes['tumor_region'] = postgresql.ARRAY(postgresql.REAL)
     return ranges, dtypes
 
 def init_connection(schema=None):
@@ -76,16 +78,16 @@ def init_connection(schema=None):
     engine = create_engine(conn_str)
     if schema is not None:
         try:
-            engine.execute("CREATE SCHEMA "+schema)
+            engine.execute(CreateSchema(schema))
         except:
             pass
     return engine
 
 def get_samples(num_samples, t):
     for i in range(0, num_samples):
-        if i%1000==0:
-            print str(i)+"/"+str(num_samples)
-            print str(time.time()-t) + "s elapsed"
+        # if i%1000==0:
+        #     print str(i)+"/"+str(num_samples)
+            # print str(time.time()-t) + "s elapsed"
         if i == 0:
             s = get_formatted_sample_data()
             df = pd.DataFrame(index = np.arange(0,num_samples), columns = s.keys())
@@ -96,22 +98,61 @@ def get_samples(num_samples, t):
 
 def reset(engine):
     engine.execute("drop owned by owlieee")
+    engine.dispose()
+
+def to_sql(engine, df, dtypes, schema, table = 'samples', if_exists='fail', sep='\t', encoding='utf8'):
+    # Create table
+    table_name = schema + '.' + table
+    if engine.has_table(table, schema)==False:
+        df[:1].to_sql(table,
+                    engine,
+                    schema = schema,
+                    if_exists=if_exists,
+                    index = True,
+                    dtype = dtypes)
+
+    # Prepare data
+    output = cStringIO.StringIO()
+    df.to_csv(output, sep=sep, header=False)
+    output.seek(0)
+
+
+    # Insert data
+    connection = engine.raw_connection()
+    cursor = connection.cursor()
+    cursor.copy_from(output,"test_001.samples", sep=sep)
+    connection.commit()
+    cursor.close()
+    del cursor
+    connection.close()
 
 if __name__ == '__main__':
-    schema = 'test_1.0'
-    num_samples = 1000
-    print "storing " + str(num_samples) + " samples to " + schema + ".samples"
+    schema = 'test_001'
+    total_samples = 10000
+    print "storing " + str(total_samples) + " samples to " + schema + ".samples"
 
     print "initializing connection..."
     engine = init_connection(schema = schema)
     ranges, dtypes = init_data()
+    completed_samples = 0
+    while completed_samples < total_samples:
+        batch = 100
 
-    t = time.time()
-    print "generating samples..."
-    df = get_samples(num_samples, t)
+        print "generating samples..."
+        t = time.time()
+        df = get_samples(batch, t)
+        print "generated " + str(batch) + ' t = ' + str(time.time() - t)
 
-    print "storing samples..."
-    store_samples(df, dtypes, schema = schema, if_exists = 'append')
+        print "storing samples..."
+        t = time.time()
+        store_samples(df,dtypes, schema = schema)
+        print "stored " + str(batch) + ' t = ' + str(time.time() - t)
 
+        completed_samples += batch
+        print str(total_samples - completed_samples) + ' remain'
     engine.dispose()
     print "Done! connection closed"
+
+    g = {k:v for k, v in sample.gene_arrays.items() if k in keep}
+    X[i] = np.dstack(g.values()[0:13])[:, :, :]
+    y[i] = type_map[sample.sample_type]
