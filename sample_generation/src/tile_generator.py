@@ -22,7 +22,7 @@ class TileSample:
         self.sample_type = None
         self.sample_info = defaultdict(list)
         self.tumor_region = None
-        self.gene_arrays = {}
+        self.gene_arrays = pd.Series()
         self.ranges = None
         self._array_size = (9,10)
         self._gene_range = (5,40)
@@ -46,6 +46,12 @@ class TileSample:
             self._modify_genes()
 
         self._calculate_signal_purity()
+
+    def _convert_to_list(self):
+        #self.gene_arrays = pd.Series(self.gene_arrays)
+        self.gene_arrays = self.gene_arrays.apply(lambda x: [list(v) for v in x])
+        if self.tumor_region is not None:
+            self.tumor_region = [list(v) for v in self.tumor_region]
 
     def _calculate_signal_purity(self):
         """
@@ -228,7 +234,8 @@ class TileSample:
         for ix, gene_info in self.ranges['normal'].iterrows():
             mean = np.random.normal(loc = gene_info['mean'], scale = gene_info['std'])
             gene_array = np.random.normal(loc = mean, scale = gene_info['std'], size = self._array_size)
-            self.gene_arrays.update({gene_info['gene']: gene_array})
+            #self.gene_arrays.update({gene_info['gene']: gene_array})
+            self.gene_arrays[gene_info['gene']] = gene_array
             if np.random.random()<gene_info['prob_outlier']:
                 self._set_normal_outliers(gene_info)
 
@@ -261,21 +268,10 @@ class TileSample:
     def _store_summary_stats(self, gene, region, gene_array):
         if len(self.sample_info['gene_ranges'])==0:
             self.sample_info['gene_ranges'] = pd.DataFrame()
-        if len(gene_array)==0:
-            self.sample_info['gene_ranges'] = self.sample_info['gene_ranges'].append(
-                                                pd.Series({'gene': gene,
-                                                'region': region,
-                                                'num_changed': len(gene_array.flatten())})
-                                                    , ignore_index = True)
-        else:
-            self.sample_info['gene_ranges'] = self.sample_info['gene_ranges'].append(
-                                                pd.Series({'gene': gene,
-                                                'region': region,
-                                                'num_changed': len(gene_array.flatten()),
-                                                'mean': np.mean(gene_array),
-                                                'std': np.std(gene_array),
-                                                'min': np.min(gene_array),
-                                                'max': np.max(gene_array)}), ignore_index = True)
+        self.sample_info['gene_ranges'] = self.sample_info['gene_ranges'].append(
+                                            pd.Series({'gene': gene,
+                                            'region': region,
+                                            'num_changed': gene_array.size}), ignore_index = True)
 
     def _get_update_ind(self, region):
         """
