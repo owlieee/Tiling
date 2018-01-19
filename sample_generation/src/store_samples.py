@@ -150,7 +150,7 @@ if __name__ == '__main__':
         print("generating samples...")
         t = time.time()
         df = get_samples(batch, t, min_ind)
-        print "generated " + str(batch) + ' t = ' + str(time.time() - t)
+        print("generated " + str(batch) + ' t = ' + str(time.time() - t)
 
         print "storing samples..."
         t = time.time()
