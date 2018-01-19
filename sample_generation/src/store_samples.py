@@ -44,25 +44,12 @@ def store_samples(df,dtypes, schema = None, if_exists = 'append'):
             dtype = dtypes)
 
 def get_formatted_sample_data():
-    t = time.time()
     sample = TileSample()
-    t1 = time.time()
-    #print 1, t1-t
     sample.generate_sample(ranges)
-    t2 = time.time()
-    #print 2, t2-t1
     sample._convert_to_list()
-    t3 = time.time()
-    #print 3, t3-t2
     sample_metadata = make_sample_metadata(sample)
-    t4 = time.time()
-    #print 4, t4-t3
     sample_data = sample_metadata.append(sample.gene_arrays)
-    t5 = time.time()
-    #print 5, t5-t4
     sample_data = sample_data.append(pd.Series({'tumor_region': sample.tumor_region}))
-    t6 = time.time()
-    #print 6, t6-t5
     return sample_data
 
 def init_data():
