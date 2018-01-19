@@ -40,7 +40,7 @@ def store_samples(df,dtypes, schema = None, if_exists = 'append'):
             if_exists = if_exists,
             schema = schema,
             index = True,
-            index_col = 'index',
+            index_label = 'index',
             dtype = dtypes)
 
 def get_formatted_sample_data():
