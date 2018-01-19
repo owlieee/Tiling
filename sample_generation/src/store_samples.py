@@ -95,57 +95,31 @@ def get_samples(num_samples, t, min_ind):
         # if i%1000==0:
         #     print str(i)+"/"+str(num_samples)
             # print str(time.time()-t) + "s elapsed"
-        if i == 0:
+        if i == min_ind:
             s = get_formatted_sample_data()
             df = pd.DataFrame(index = np.arange(min_ind,num_samples+min_ind), columns = s.keys())
-            df.iloc[i] = s
+            df.loc[i] = s
         else:
-            df.iloc[i] = get_formatted_sample_data()
+            df.loc[i] = get_formatted_sample_data()
     return df
 
 def reset(engine):
     engine.execute("drop owned by owlieee")
     engine.dispose()
 
-def to_sql(engine, df, dtypes, schema, table = 'samples', if_exists='fail', sep='\t', encoding='utf8'):
-    # Create table
-    table_name = schema + '.' + table
-    if engine.has_table(table, schema)==False:
-        df[:1].to_sql(table,
-                    engine,
-                    schema = schema,
-                    if_exists=if_exists,
-                    index = True,
-                    dtype = dtypes)
-
-    # Prepare data
-    output = StringIO()
-    df.to_csv(output, sep=sep, header=False)
-    output.seek(0)
-
-
-    # Insert data
-    connection = engine.raw_connection()
-    cursor = connection.cursor()
-    cursor.copy_from(output,"test_001.samples", sep=sep)
-    connection.commit()
-    cursor.close()
-    del cursor
-    connection.close()
-
 if __name__ == '__main__':
 
     schema = 'test_001'
-    total_samples = 10000
+    total_samples = 20000
     print("storing " + str(total_samples) + " samples to " + schema + ".samples")
 
     print("initializing connection...")
-    engine = init_connection(schema = schema)
+    engine = init_connection(schema = schema)#, aws = False)
     ranges, dtypes = init_data()
     completed_samples = 0
     min_ind = 0
     while completed_samples < total_samples:
-        batch = 100
+        batch = 1000
 
         print("generating samples...")
         t = time.time()
@@ -164,4 +138,28 @@ if __name__ == '__main__':
     print("Done! connection closed")
 
 
-#just do them all at once. make the index column.
+# def to_sql(engine, df, dtypes, schema, table = 'samples', if_exists='fail', sep='\t', encoding='utf8'):
+#     # Create table
+#     table_name = schema + '.' + table
+#     if engine.has_table(table, schema)==False:
+#         df[:1].to_sql(table,
+#                     engine,
+#                     schema = schema,
+#                     if_exists=if_exists,
+#                     index = True,
+#                     dtype = dtypes)
+#
+#     # Prepare data
+#     output = StringIO()
+#     df.to_csv(output, sep=sep, header=False)
+#     output.seek(0)
+#
+#
+#     # Insert data
+#     connection = engine.raw_connection()
+#     cursor = connection.cursor()
+#     cursor.copy_from(output,"test_001.samples", sep=sep)
+#     connection.commit()
+#     cursor.close()
+#     del cursor
+#     connection.close()

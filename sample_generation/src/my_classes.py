@@ -45,5 +45,21 @@ def __get_exploration_order(self, list_IDs):
     indexes = np.arange(len(list_IDs))
     if self.shuffle == True:
       np.random.shuffle(indexes)
-
     return indexes
+
+
+def __data_generation(self, labels, list_IDs_temp):
+  'Generates data of batch_size samples' # X : (n_samples, v_size, v_size, v_size, n_channels)
+  # Initialization
+  X = np.empty((self.batch_size, self.dim_x, self.dim_y, self.dim_z, 1))
+  y = np.empty((self.batch_size), dtype = int)
+
+  # Generate data
+  for i, ID in enumerate(list_IDs_temp):
+      # Store volume
+      X[i, :, :, :, 0] = np.load(ID + '.npy')
+
+      # Store class
+      y[i] = labels[ID]
+
+  return X, sparsify(y)
