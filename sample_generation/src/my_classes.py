@@ -1,65 +1,64 @@
-import pandas as pd
-from tile_generator import TileSample, load_ranges
-import matplotlib.pyplot as plt
-import matplotlib
+#https://stanford.edu/~shervine/blog/keras-how-to-generate-data-on-the-fly.html
 import numpy as np
-from sqlalchemy import create_engine, Table, Column, Integer, String, MetaData, ForeignKey
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.dialects import postgresql
-from sqlalchemy.schema import CreateSchema
-import cStringIO
-import json
-import time
-from sklearn.model_selection import train_test_split
+import pandas as pd
 
-def init_connection():
-    with open('config/config.json') as f:
-        conf = json.load(f)
+class DataGenerator(object):
+    'Generates data for Keras'
+    def __init__(self, engine, dim_x = 9, dim_y = 10, dim_z = 48, batch_size = 32, shuffle = True):
+        'Initialization'
+        self.engine = engine
+        self.dim_x = dim_x
+        self.dim_y = dim_y
+        self.dim_z = dim_z
+        self.batch_size = batch_size
+        self.shuffle = shuffle
 
-    conn_str = "postgresql://{}:{}@{}/{}".format(conf['user'],conf['passw'],conf['host'], conf['database'])
-    engine = create_engine(conn_str)
-    return engine
+    def generate(self, labels, list_IDs):
+        'Generates batches of samples'
+        # Infinite loop
+        while 1:
+            # Generate order of exploration of dataset
+            indexes = self.__get_exploration_order(list_IDs)
+            # Generate batches
+            imax = int(len(indexes)/self.batch_size)
+            for i in range(imax):
+                # Find list of IDs
+                list_IDs_temp = [list_IDs[k] for k in indexes[i*self.batch_size:(i+1)*self.batch_size]]
+                # Generate data
+                X, y = self.__data_generation(labels, list_IDs_temp)
+                yield X, y
+    def __get_exploration_order(self, list_IDs):
+        'Generates order of exploration'
+        # Find exploration order
+        indexes = np.arange(len(list_IDs))
+        if self.shuffle == True:
+            np.random.shuffle(indexes)
+        return indexes
 
-engine = init_connection()
+    def __query_db(self, ID):
+        'query database for one sample, normalize'
+        sql = "SELECT * FROM test_001.samples WHERE index=" + str(ID)
+        sample = pd.read_sql_query(sql, engine)
+        return np.dstack(sample[gene_cols].values[0])/40.
 
-df = pd.read_sql_table("samples", engine, schema = "test_001", columns= ['sample_type'])
-ids = df.index.values
-train_size = int(len(ids)*.75)
-train = set(np.random.choice(ids, size=train_size, replace = False))
-test = set(ids)-set(train)
-partitions = {'train': list(train), 'test': list(test)}
+    def __data_generation(self, labels, list_IDs_temp):
+        'Generates data of batch_size samples' # X : (n_samples, v_size, v_size, v_size, n_channels)
+        # Initialization
+        X = np.empty((self.batch_size, self.dim_x, self.dim_y, self.dim_z, 1))
+        y = np.empty((self.batch_size), dtype = int)
 
+        # Generate data
+        for i, ID in enumerate(list_IDs_temp):
+            # Store volume
+            X[i, :, :, :, 0] =self.__query_db(ID)
 
-def __init__(self, dim_x = 9, dim_y = 10, dim_z = 48, batch_size = 32, shuffle = True):
-    'Initialization'
-    self.dim_x = dim_x
-    self.dim_y = dim_y
-    self.dim_z = dim_z
-    self.batch_size = batch_size
-    self.shuffle = shuffle
+            # Store class
+            y[i] = labels[ID]
 
+        return X, sparsify(y)
 
-def __get_exploration_order(self, list_IDs):
-    'Generates order of exploration'
-    # Find exploration order
-    indexes = np.arange(len(list_IDs))
-    if self.shuffle == True:
-      np.random.shuffle(indexes)
-    return indexes
-
-
-def __data_generation(self, labels, list_IDs_temp):
-  'Generates data of batch_size samples' # X : (n_samples, v_size, v_size, v_size, n_channels)
-  # Initialization
-  X = np.empty((self.batch_size, self.dim_x, self.dim_y, self.dim_z, 1))
-  y = np.empty((self.batch_size), dtype = int)
-
-  # Generate data
-  for i, ID in enumerate(list_IDs_temp):
-      # Store volume
-      X[i, :, :, :, 0] = np.load(ID + '.npy')
-
-      # Store class
-      y[i] = labels[ID]
-
-  return X, sparsify(y)
+def sparsify(y):
+    'Returns labels in binary NumPy array'
+    n_classes = # Enter number of classes
+    return np.array([[1 if y[i] == j else 0 for j in range(n_classes)]
+                   for i in range(y.shape[0])])
