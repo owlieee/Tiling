@@ -71,10 +71,16 @@ def init_data():
     dtypes['tumor_region'] = postgresql.ARRAY(postgresql.REAL)
     return ranges, dtypes
 
-def init_connection(schema=None):
-    with open('config/config.json') as f:
-        conf = json.load(f)
-
+def init_connection(schema=None, aws = False):
+    if aws == False:
+        with open('config/config.json') as f:
+            conf = json.load(f)
+    else:
+        conf = {}
+        conf['user'] = input('Enter user: ')
+        conf['passw'] = input('Enter passw: ')
+        conf['host'] = input('Enter host: ')
+        conf['database'] = input('Enter database: ')
     conn_str = "postgresql://{}:{}@{}/{}".format(conf['user'],conf['passw'],conf['host'], conf['database'])
     engine = create_engine(conn_str)
     if schema is not None:
