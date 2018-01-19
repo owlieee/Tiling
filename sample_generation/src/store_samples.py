@@ -39,7 +39,8 @@ def store_samples(df,dtypes, schema = None, if_exists = 'append'):
             engine,
             if_exists = if_exists,
             schema = schema,
-            index = False,
+            index = True,
+            index_col = 'index'
             dtype = dtypes)
 
 def get_formatted_sample_data():
@@ -83,14 +84,14 @@ def init_connection(schema=None):
             pass
     return engine
 
-def get_samples(num_samples, t):
-    for i in range(0, num_samples):
+def get_samples(num_samples, t, min_ind):
+    for i in range(min_ind, num_samples+min_ind):
         # if i%1000==0:
         #     print str(i)+"/"+str(num_samples)
             # print str(time.time()-t) + "s elapsed"
         if i == 0:
             s = get_formatted_sample_data()
-            df = pd.DataFrame(index = np.arange(0,num_samples), columns = s.keys())
+            df = pd.DataFrame(index = np.arange(min_ind,num_samples+min_ind), columns = s.keys())
             df.iloc[i] = s
         else:
             df.iloc[i] = get_formatted_sample_data()
@@ -135,12 +136,13 @@ if __name__ == '__main__':
     engine = init_connection(schema = schema)
     ranges, dtypes = init_data()
     completed_samples = 0
+    min_ind = 0
     while completed_samples < total_samples:
         batch = 100
 
         print "generating samples..."
         t = time.time()
-        df = get_samples(batch, t)
+        df = get_samples(batch, t, min_ind)
         print "generated " + str(batch) + ' t = ' + str(time.time() - t)
 
         print "storing samples..."
@@ -149,10 +151,10 @@ if __name__ == '__main__':
         print "stored " + str(batch) + ' t = ' + str(time.time() - t)
 
         completed_samples += batch
+        min_ind += batch
         print str(total_samples - completed_samples) + ' remain'
     engine.dispose()
     print "Done! connection closed"
 
-    g = {k:v for k, v in sample.gene_arrays.items() if k in keep}
-    X[i] = np.dstack(g.values()[0:13])[:, :, :]
-    y[i] = type_map[sample.sample_type]
+
+#just do them all at once. make the index column.
