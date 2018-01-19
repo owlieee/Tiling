@@ -152,7 +152,7 @@ if __name__ == '__main__':
         df = get_samples(batch, t, min_ind)
         print("generated " + str(batch) + ' t = ' + str(time.time() - t)
 
-        print "storing samples..."
+        print("storing samples...")
         t = time.time()
         store_samples(df,dtypes, schema = schema)
         print("stored " + str(batch) + ' t = ' + str(time.time() - t))
