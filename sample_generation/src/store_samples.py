@@ -7,7 +7,7 @@ from sqlalchemy import create_engine, Table, Column, Integer, String, MetaData, 
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.schema import CreateSchema
-import cStringIO
+from io import StringIO
 import json
 import time
 
@@ -119,7 +119,7 @@ def to_sql(engine, df, dtypes, schema, table = 'samples', if_exists='fail', sep=
                     dtype = dtypes)
 
     # Prepare data
-    output = cStringIO.StringIO()
+    output = StringIO()
     df.to_csv(output, sep=sep, header=False)
     output.seek(0)
 
@@ -150,7 +150,7 @@ if __name__ == '__main__':
         print("generating samples...")
         t = time.time()
         df = get_samples(batch, t, min_ind)
-        print("generated " + str(batch) + ' t = ' + str(time.time() - t)
+        print("generated " + str(batch) + ' t = ' + str(time.time() - t))
 
         print("storing samples...")
         t = time.time()
