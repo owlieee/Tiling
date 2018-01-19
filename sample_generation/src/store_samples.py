@@ -40,7 +40,7 @@ def store_samples(df,dtypes, schema = None, if_exists = 'append'):
             if_exists = if_exists,
             schema = schema,
             index = True,
-            index_col = 'index'
+            index_col = 'index',
             dtype = dtypes)
 
 def get_formatted_sample_data():
@@ -134,11 +134,12 @@ def to_sql(engine, df, dtypes, schema, table = 'samples', if_exists='fail', sep=
     connection.close()
 
 if __name__ == '__main__':
+
     schema = 'test_001'
     total_samples = 10000
-    print "storing " + str(total_samples) + " samples to " + schema + ".samples"
+    print("storing " + str(total_samples) + " samples to " + schema + ".samples")
 
-    print "initializing connection..."
+    print("initializing connection...")
     engine = init_connection(schema = schema)
     ranges, dtypes = init_data()
     completed_samples = 0
@@ -146,7 +147,7 @@ if __name__ == '__main__':
     while completed_samples < total_samples:
         batch = 100
 
-        print "generating samples..."
+        print("generating samples...")
         t = time.time()
         df = get_samples(batch, t, min_ind)
         print "generated " + str(batch) + ' t = ' + str(time.time() - t)
@@ -154,13 +155,13 @@ if __name__ == '__main__':
         print "storing samples..."
         t = time.time()
         store_samples(df,dtypes, schema = schema)
-        print "stored " + str(batch) + ' t = ' + str(time.time() - t)
+        print("stored " + str(batch) + ' t = ' + str(time.time() - t))
 
         completed_samples += batch
         min_ind += batch
-        print str(total_samples - completed_samples) + ' remain'
+        print(str(total_samples - completed_samples) + ' remain')
     engine.dispose()
-    print "Done! connection closed"
+    print("Done! connection closed")
 
 
 #just do them all at once. make the index column.
