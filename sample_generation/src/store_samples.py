@@ -71,7 +71,7 @@ def init_data():
     dtypes['tumor_region'] = postgresql.ARRAY(postgresql.REAL)
     return ranges, dtypes
 
-def init_connection(schema=None, aws = False):
+def init_connection(schema=None, aws = True):
     if aws == False:
         with open('config/config.json') as f:
             conf = json.load(f)
