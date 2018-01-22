@@ -94,13 +94,12 @@ class TileSample:
         return tumor_pct*self.sample_info['tumor_size']
 
     def _calculate_normal_pct(self):
+        normal_pct = 1
         if len(self.sample_info['gene_ranges'])>0:
             normal_changes = self.sample_info['gene_ranges'].loc[self.sample_info['gene_ranges']['region']=='normal_outlier'][['gene', 'num_changed']]
             if len(normal_changes)>0:
                 n = normal_changes.merge(self.ranges['normal'][['gene', 'prob_outlier']], how = 'outer').fillna(0)
                 normal_pct = np.mean((90-n['num_changed'])/90.)
-        else:
-            normal_pct = 1
         return normal_pct
 
     def _generate_tumor(self, size = None):
