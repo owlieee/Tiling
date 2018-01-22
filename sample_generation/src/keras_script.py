@@ -73,14 +73,14 @@ validation_generator = DataGenerator(**params).generate(partition['test'])
 n_classes = 3
 # Design model
 model = Sequential()
-model.add(ZeroPadding2D(padding = (5,4), data_format = 'channels_last',input_shape=(9,10,48)))
+model.add(ZeroPadding2D(padding = (4,4), data_format = 'channels_last',input_shape=(9,10,48)))
 model.add(Convolution2D(32, (2,2), activation='relu', data_format='channels_last', input_shape=(9,10,48)))
 model.add(Convolution2D(10, (3,3), activation='relu'))
-#model.add(MaxPooling2D(pool_size=(2,2)))
-#model.add(Dropout(0.25))
+model.add(MaxPooling2D(pool_size=(2,2)))
+model.add(Dropout(0.25))
 model.add(Flatten())
 model.add(Dense(128, activation='relu'))
-#model.add(Dropout(0.5))
+model.add(Dropout(0.5))
 model.add(Dense(n_classes, activation='softmax'))
 sgd = SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
 model.compile(loss='categorical_crossentropy',
