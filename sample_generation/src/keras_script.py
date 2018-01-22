@@ -44,6 +44,7 @@ def init_psycopg2(aws = True):
 
 def get_partitions(engine):
     df = pd.read_sql_table("samples", engine, schema = "test_001", columns= ['sample_type', 'index'])
+    df = df[df['sample_type']!='normal']
     type_map = {'normal': 0, 'nonresponder': 1, 'responder': 2}
     labels = df['sample_type'].map(type_map).tolist()
     train_size = int(len(df)*.75)
@@ -70,7 +71,7 @@ params = {'connection': connection,
 training_generator = DataGenerator(**params).generate(partition['train'])
 validation_generator = DataGenerator(**params).generate(partition['test'])
 
-n_classes = 3
+n_classes = 2
 # Design model
 model = Sequential()
 model.add(ZeroPadding2D(padding = (4,4), data_format = 'channels_last',input_shape=(9,10,48)))

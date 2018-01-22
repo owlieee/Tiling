@@ -62,7 +62,7 @@ class DataGenerator(object):
         X = np.empty((self.batch_size, self.dim_x, self.dim_y, self.dim_z))
         y = np.empty((self.batch_size), dtype = int)
 
-        type_map = {'normal': 0, 'nonresponder': 1, 'responder': 2}
+        type_map = {'normal': 0, 'nonresponder': 0, 'responder': 1}
         data = self.__query_db(list_IDs_temp)
         # Generate data
         for i, sample in enumerate(data):
