@@ -54,7 +54,7 @@ def get_partitions(engine):
 
 
 #Datasets
-engine = init_connection(aws = False)
+engine = init_connection(aws = True)
 partition = get_partitions(engine)
 connection = engine.connect()
 #Parameters
