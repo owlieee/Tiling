@@ -97,14 +97,19 @@ def reset(engine):
 if __name__ == '__main__':
 
     schema = 'test_001'
-    total_samples = 20000
+    total_samples = 100000
     print("storing " + str(total_samples) + " samples to " + schema + ".samples")
 
     print("initializing connection...")
     engine = init_connection(schema = schema)#, aws = False)
     ranges, dtypes = init_data()
     completed_samples = 0
-    min_ind = 0
+    if engine.has_table('samples', schema = schema):
+        df = pd.read_sql_table("samples", engine, schema = schema, columns=['sample_type', 'index'])
+        min_ind = df['index'].max() + 1
+    else:
+        min_ind = 0
+    print("min_ind = " + str(min_ind))
     while completed_samples < total_samples:
         batch = 1000
 
