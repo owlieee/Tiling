@@ -28,7 +28,7 @@ class TileSample:
         self._array_size = (9,10)
         self._gene_range = (5,40)
 
-    def generate_sample(self, ranges, sample_type=None):
+    def generate_sample(self, ranges, sample_type=None, tumor_size=None):
         """
         generates a single random sample according to the rules for sample_type
         INPUTS:
@@ -44,6 +44,8 @@ class TileSample:
             self.sample_type = sample_type
 
         if self.sample_type != 'normal':
+            if tumor_size:
+                self.sample_info['tumor_size'] = float(tumor_size)
             self._generate_tumor()
             self._modify_genes()
         else:
@@ -102,7 +104,7 @@ class TileSample:
                 normal_pct = np.mean((90-n['num_changed'])/90.)
         return normal_pct
 
-    def _generate_tumor(self, size = None):
+    def _generate_tumor(self):
         """
         generates random profile of a tumor_region.
         Optional input size to set number of tumor cells
@@ -112,11 +114,11 @@ class TileSample:
         """
 
         #generate tumor heatmap from randomly selected attributes
-        self._set_random_tumor_attributes(size = size)
+        self._set_random_tumor_attributes()
         self._set_tumor_heatmap()
 
 
-    def _set_random_tumor_attributes(self, size = None):
+    def _set_random_tumor_attributes(self):
         """
         randomly choose attributes for tumor generation with optional input "size"
         INPUTS: size: int or None
@@ -124,10 +126,9 @@ class TileSample:
         """
         array_area = np.product(self._array_size)
 
-        if size is None:
+        #randomly set tumor size if not user input
+        if self.sample_info['tumor_size'] is None:
             self.sample_info['tumor_size'] = float(np.floor(np.random.uniform(1,array_area)))
-        else:
-            self.sample_info['tumor_size'] = float(size)
 
         self.sample_info['tumor_percent'] = 100*self.sample_info['tumor_size']/float(array_area)
 
