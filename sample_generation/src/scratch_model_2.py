@@ -13,7 +13,7 @@ import keras_script
 import tiling_helper
 from keras.utils import np_utils
 from sklearn.model_selection import train_test_split
-from keras.optimizers import SGD
+#from keras.optimizers import SGD
 from collections import defaultdict
 
 all_gene_cols = [ u'ABL1', u'AKT1', u'ALK', u'APC', u'ATM', u'BRAF', u'CDH1', u'CDKN2A', u'CSF1R',
@@ -58,7 +58,7 @@ def format_sample_set(query_result, gene_list, n_samples):
     df = pd.DataFrame(index = range(0, n_samples), columns = gene_list + meta_cols)
     for i, sample in enumerate(query_result):
         if i%1000 ==0:
-            print "{}/{}".format(i, n_samples)
+            print("{}/{}".format(i, n_samples))
         g = [np.array(sample[gene]) for gene in gene_list]
         m = {col:sample[col] for col in meta_cols}
         m.update(dict(zip(gene_list, [np.mean(a) for a in g])))
