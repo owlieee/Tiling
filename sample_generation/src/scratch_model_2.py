@@ -144,35 +144,38 @@ def check_3_classes(X, y, n_genes=48):
 # b_13 = check_binary(X, y, n_genes=len(gene_list))
 # model_13 = check_3_classes(X, y, n_genes=len(gene_list))
 
+if __name__=='__main__':
+    print("querying")
+    gene_list = all_gene_cols
+    custom_query = "WHERE index > 20000"
+    n_samples = 100000
+    query_result = get_sample_set(format_col_list(gene_list), n_samples=n_samples, custom_query=custom_query)
+    df, X, y = format_sample_set(query_result, gene_list, n_samples)
 
-gene_list = all_gene_cols
-custom_query = "WHERE index > 20000"
-n_samples = 100000
-query_result = get_sample_set(format_col_list(gene_list), n_samples=n_samples, custom_query=custom_query)
-df, X, y = format_sample_set(query_result, gene_list, n_samples)
+    print("trying gene sets")
+    sig = get_interest_genes()
+    nosig_ix = [ix for ix, v in enumerate(all_gene_cols) if v not in sig]
+    np.random.shuffle(nosig_ix)
+    models = {}
+    gene_list = sig
+    for i in range(0, len(all_gene_cols)-len(sig)):
+        print(i)
+        gene_ix = [ix for ix, v in enumerate(all_gene_cols) if v in gene_list]
+        X_new = X[:,:,:,gene_ix]
+        model_ = check_3_classes(X_new, y, n_genes=len(gene_list))
+        models[i] = model_
+        gene_list = gene_list + [str(all_gene_cols[nosig_ix[i]])]
+    print("saving results")
+    results = pd.DataFrame()
+    for k, v in models.items():
+        temp = pd.Series({'n_extra': k,
+            'accuracy': v['accuracy'],
+            'loss': v['loss'],
+            'params': v['model'].count_params()})
+        results = results.append(temp, ignore_index = True)
 
-sig = get_interest_genes()
-nosig_ix = [ix for ix, v in enumerate(all_gene_cols) if v not in sig]
-np.random.shuffle(nosig_ix)
-models = {}
-gene_list = sig
-for i in range(0, len(all_gene_cols)-len(sig)):
-    gene_ix = [ix for ix, v in enumerate(all_gene_cols) if v in gene_list]
-    X_new = X[:,:,:,gene_ix]
-    model_ = check_3_classes(X_new, y, n_genes=len(gene_list))
-    models[i] = model_
-    gene_list = gene_list + [str(all_gene_cols[nosig_ix[i]])]
-
-results = pd.DataFrame()
-for k, v in models.items():
-    temp = pd.Series({'n_extra': k,
-        'accuracy': v['accuracy'],
-        'loss': v['loss'],
-        'params': v['model'].count_params()})
-    results = results.append(temp, ignore_index = True)
-
-results.to_csv('results.csv')
-# #
-# #
-# for k, v in models.items():
-#     v['model'].evaluate(v['X_test'], v['y_test'])
+    results.to_csv('results.csv')
+    # #
+    # #
+    # for k, v in models.items():
+    #     v['model'].evaluate(v['X_test'], v['y_test'])
