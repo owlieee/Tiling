@@ -6,7 +6,7 @@ from keras.layers import Convolution2D, MaxPooling2D, ZeroPadding2D
 from keras.utils import np_utils
 from keras.optimizers import SGD
 from my_classes import DataGenerator
-import simplejson
+#import simplejson
 from sqlalchemy import create_engine
 import psycopg2
 import keras_script
@@ -45,7 +45,7 @@ def format_col_list(gene_list):
     return ", ".join(['"{}"'.format(g) for g in gene_list])
 
 def get_sample_set(gene_string, n_samples=10000, custom_query=''):
-    engine = keras_script.init_connection(aws = False)
+    engine = keras_script.init_connection(aws = True)
     connection = engine.connect()
     sql = """SELECT {} FROM test_001.samples {} LIMIT {};""".format(gene_string, custom_query, n_samples)
     query_result = connection.execute(sql)
