@@ -16,6 +16,19 @@ from sklearn.model_selection import train_test_split
 from keras.optimizers import SGD
 from collections import defaultdict
 
+all_gene_cols = [ u'ABL1', u'AKT1', u'ALK', u'APC', u'ATM', u'BRAF', u'CDH1', u'CDKN2A', u'CSF1R',
+       u'CTNNB1', u'EGFR', u'ERBB2', u'ERBB4', u'FBXW7', u'FGFR1', u'FGFR2',
+       u'FGFR3', u'FLT3', u'GNA11', u'GNAQ', u'GNAS', u'HNF1A', u'HRAS',
+       u'IDH1', u'JAK2', u'JAK3', u'KDR', u'KIT', u'KRAS', u'MET', u'MLH1',
+       u'MPL', u'NOTCH1', u'NPM1', u'NRAS', u'PDGFRA', u'PIK3CA', u'PTEN',
+       u'PTPN11', u'RB1', u'RET', u'SMAD4', u'SMARCB1', u'SMO', u'SRC',
+       u'STK11', u'TP53', u'VHL']
+
+meta_cols = ['index', u'sample_type', u'signal_purity', u'touching_tumor_size',
+   u'tumor_percent', u'tumor_size', u'tumor_type']
+
+type_map = {'normal': 0, 'nonresponder': 1, 'responder': 2}
+
 def get_interest_genes():
     responder_t_changes = {'CDKN2A', 'NOTCH1', 'EGFR', 'IDH1', 'KRAS', 'SMARCB1', 'APC', 'GNA11', 'PIK3CA'}
     responder_touch_t_changes = {'HRAS', 'SMO'}
@@ -27,41 +40,49 @@ def get_interest_genes():
     keep.update(nonresponder_t_changes)
     return list(keep)
 
-def format_gene_list(gene_list):
+def format_col_list(gene_list):
+    gene_list = gene_list + meta_cols
     return ", ".join(['"{}"'.format(g) for g in gene_list])
-def get_sample_set(gene_list):
+
+def get_sample_set(gene_string, n_samples=10000, custom_query=''):
     engine = keras_script.init_connection(aws = False)
     connection = engine.connect()
-    sql = """SELECT sample_type, "CDKN2A", "SMARCB1", "PIK3CA", "IDH1", "EGFR", "NOTCH1", "SMO", "JAK3", "GNA11", "ABL1", "APC", "HRAS", "KRAS" FROM test_001.samples
-            WHERE index > 20000 AND
-                signal_purity < 1
-            LIMIT 20000;
-             """
+    sql = """SELECT {} FROM test_001.samples {} LIMIT {};""".format(gene_string, custom_query, n_samples)
     query_result = connection.execute(sql)
-    n_samples= 20000
-    X = np.empty((n_samples, 9, 10, 13))
+    connection.close()
+    return query_result
+
+def format_sample_set(query_result, gene_list, n_samples):
+    X = np.empty((n_samples, 9, 10, len(gene_list)))
     y = np.empty((n_samples))
-    type_map = {'normal': 0, 'nonresponder': 1, 'responder': 2}
+    df = pd.DataFrame(index = range(0, n_samples), columns = gene_list + meta_cols)
     for i, sample in enumerate(query_result):
         if i%1000 ==0:
-            print i
-        g = [np.array(sample[gene]) for gene in keep]
-        X[i] = np.dstack(g[0:13])[:, :, :]
+            print "{}/{}".format(i, n_samples)
+        g = [np.array(sample[gene]) for gene in gene_list]
+        m = {col:sample[col] for col in meta_cols}
+        m.update(dict(zip(gene_list, [np.mean(a) for a in g])))
+        df.loc[i] = m
+        X[i] = np.dstack(g[0:len(gene_list)])[:, :, :]
         y[i] = type_map[sample['sample_type']]
-    return X, y
+    return df, X, y
 
-def get_train_test(X, y, exclude = None):
+def get_subset(X, y, exclude):
     if exclude is None:
         X_sub = X
         y_sub = y
     else:
         X_sub = X[np.where(y!=exclude)]
         y_sub = y[np.where(y!=exclude)]
-    n_classes = len(np.unique(y_sub))
     if exclude == 0:
         y_sub = y_sub-1
     elif exclude == 1:
         y_sub = y_sub/2
+    n_classes = len(np.unique(y_sub))
+    return X_sub, y_sub, n_classes
+
+def get_train_test(X, y, exclude = None):
+    X_sub, y_sub, n_classes = get_subset(X, y, exclude)
     X_train, X_test, y_train, y_test = train_test_split(X_sub, y_sub, test_size=0.25, random_state=42)
     X_train = X_train.astype('float32')
     X_test = X_test.astype('float32')
@@ -71,14 +92,14 @@ def get_train_test(X, y, exclude = None):
     Y_test = np_utils.to_categorical(y_test, n_classes)
     return X_train, X_test, Y_train, Y_test
 
-def check_binary(X, y):
-    subsets = {'nr_r': 0,
-               'nr_n': 2,
-               'r_n': 1}
+def check_binary(X, y, n_genes=48):
+    subsets = {'nr_r': type_map['normal'],
+               'nr_n': type_map['responder'],
+               'r_n': type_map['nonresponder']}
     models = defaultdict(dict)
     for k, exclude in subsets.items():
         X_train, X_test, y_train, y_test = get_train_test(X, y, exclude = exclude)
-        model = keras_script.test_model(input_shape = (9,10,13))
+        model = keras_script.test_model(input_shape = (9,10,n_genes))
         model.fit(X_train, y_train, batch_size=32, nb_epoch=5, verbose=1)
         loss, accuracy = model.evaluate(X_test,y_test)
         models[k]['model'] = model
@@ -90,22 +111,51 @@ def check_binary(X, y):
         models[k]['accuracy'] = accuracy
     return models
 
-def check_3_classes(X, y):
+def check_3_classes(X, y, n_genes=48):
     X_train, X_test, y_train, y_test = get_train_test(X, y)#, exclude = None)
-    model = keras_script.test_model(n_classes = 3, input_shape = (9,10,13))
+    model = keras_script.test_model(n_classes = 3, input_shape = (9,10,n_genes))
     model.fit(X_train, y_train, batch_size=32, nb_epoch=5, verbose=1)
-    model = defaultdict(dict)
+    model_dict = defaultdict(dict)
     loss, accuracy = model.evaluate(X_test,y_test)
-    model['model'] = model
-    model['X_train'] = X_train
-    model['y_train'] = y_train
-    model['X_test'] = X_test
-    model['y_test'] = y_test
-    model['loss'] = loss
-    model['accuracy'] = accuracy
-    return model
+    model_dict['model'] = model
+    #model_dict['X_train'] = X_train
+    #model_dict['y_train'] = y_train
+    #model_dict['X_test'] = X_test
+    #model_dict['y_test'] = y_test
+    model_dict['loss'] = loss
+    model_dict['accuracy'] = accuracy
+    return model_dict
 
-X, y = get_sample_set()
+
+gene_list = all_gene_cols
+custom_query = "WHERE index > 20000 AND signal_purity = 1"
+n_samples = 20000
+query_result = get_sample_set(format_col_list(gene_list), n_samples=n_samples, custom_query=custom_query)
+df, X, y = format_sample_set(query_result, gene_list, n_samples)
+b_48 = check_binary(X, y, n_genes=len(gene_list))
+model_48 = check_3_classes(X, y, n_genes=len(gene_list))
+
+
+gene_list = get_interest_genes()
+custom_query = "WHERE index > 20000 AND signal_purity = 1"
+n_samples = 20000
+query_result = get_sample_set(format_col_list(gene_list), n_samples=n_samples, custom_query=custom_query)
+df, X, y = format_sample_set(query_result, gene_list, n_samples)
+b_13 = check_binary(X, y, n_genes=len(gene_list))
+model_13 = check_3_classes(X, y, n_genes=len(gene_list))
+
+
+sig = get_interest_genes()
+nosig_ix = [ix for ix, v in enumerate(all_gene_cols) if v not in sig]
+np.random.shuffle(nosig_ix)
+models = {}
+gene_list = sig
+for i in range(0, len(all_gene_cols)-len(sig)):
+    gene_ix = [ix for ix, v in enumerate(all_gene_cols) if v in gene_list]
+    X_new = X[:,:,:,gene_ix]
+    model_ = check_3_classes(X_new, y, n_genes=len(gene_list))
+    models[i] = model_
+    gene_list = gene_list + [str(all_gene_cols[nosig_ix[i]])]
 
 
 

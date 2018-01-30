@@ -4,15 +4,23 @@ from matplotlib import style
 from tile_generator import load_ranges, TileSample
 import matplotlib
 import h5py
+import numpy as np
 style.use('ggplot')
 
 def make_numeric(value):
+    """
+    convert empty list to 0
+    """
     if value==[]:
         return 0
     else:
         return value
 
 def make_str(value):
+    """
+    convert empty list to string
+    create tag for distribution type
+    """
     if value==[]:
         return ''
     else:
@@ -21,6 +29,9 @@ def make_str(value):
         return 'X_'+x_dist + '_Y_' + y_dist
 
 def make_sample_metadata(sample):
+    """
+    convert sample object into series of metadata
+    """
     sample_metadata = pd.Series({'sample_type': sample.sample_type,
         'signal_purity': make_numeric(sample.sample_info['signal_purity']),
         'tumor_percent': make_numeric(sample.sample_info['tumor_percent']),
@@ -30,6 +41,9 @@ def make_sample_metadata(sample):
     return sample_metadata
 
 def get_groups():
+    """
+    order for plotting
+    """
     group1 = ['KRAS', 'EGFR', 'CDKN2A', 'IDH1', 'APC', 'PIK3CA', 'SMARCB1']
     group2 = ['GNA11','NOTCH1', 'SMO', 'HRAS', 'ABL1', 'JAK3', '']
     group3 = ['AKT1','ALK','ATM','BRAF','CDH1','CSF1R','CTNNB1']
@@ -41,18 +55,27 @@ def get_groups():
     return groups
 
 def standardize_gene_array(gene_array, gene):
+    """
+    standardize gene_array with normal mean and std for gene
+    """
     gene_ranges =  ranges['normal'][ranges['normal']['gene']==gene]
     mean = gene_ranges['mean'].iloc[0]
     std = gene_ranges['std'].iloc[0]
-    #pdb.set_trace()
     return ((gene_array-mean)/std)
 
 def patch(x, y, hatch, color):
+    """
+    annotate cells with textured rectangle
+    """
     return matplotlib.patches.Rectangle((x-0.5, y-0.5), 1, 1, hatch = hatch, fill = False, color = color)
 
 def plot_gene_heatmaps(sample, standardize = False):
+    """
+    make gene heatmap plot with annotated tumor region
+    """
     groups = get_groups()
     fig, ax = plt.subplots(7, 7, frameon = False, figsize = (8,8))
+    gene_arrays = []
     for ix, ax in enumerate(ax.flatten()):
         ax.grid(False)
         ax.set_xticks([])
@@ -68,9 +91,11 @@ def plot_gene_heatmaps(sample, standardize = False):
             gene_array = standardize_gene_array(gene_array, gene)
             vmin = -5
             vmax = 5
-        im =ax.imshow( gene_array, cmap = 'coolwarm', interpolation = None, vmin = vmin, vmax = vmax)
+        gene_arrays.append(gene_array)
+        #colormap_r = matplotlib.colors.ListedColormap('RdYlGn')#.reversed()
+        im =ax.imshow( gene_array, cmap = 'gist_heat', interpolation = None, vmin = vmin, vmax = vmax)
         for y,x in zip(np.where(sample.tumor_region>0)[0], np.where(sample.tumor_region>0)[1]):
-            ax.add_patch(patch(x, y, '///', 'black'))
+            ax.add_patch(patch(x, y, '///', 'white'))
     fig.suptitle(sample.sample_type +
             " signal purity = " + str(np.round(sample.sample_info['signal_purity']*100)) +\
             "% Tumor size = " + str(sample.sample_info['tumor_size']))
@@ -78,9 +103,29 @@ def plot_gene_heatmaps(sample, standardize = False):
     fig.subplots_adjust(right=0.8)
     cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
     fig.colorbar(im, cax=cbar_ax)
-    return fig
+    return gene_arrays, fig
+
+def series_to_sample(series):
+    """
+    Convert pandas series to tile sample object
+    """
+    sample = TileSample()
+    genes = get_groups()
+    for gene in genes:
+        if gene == '':
+            continue
+        sample.gene_arrays[gene]=np.array(series[gene])
+    sample.sample_type =  series['sample_type']
+    sample.tumor_region = np.array(series['tumor_region'])
+    for col in [u'index', u'signal_purity', u'touching_tumor_size',
+        u'tumor_percent', u'tumor_size', u'tumor_type']:
+        sample.sample_info[col]=series[col]
+    return sample
 
 def sample_to_hdf5(sample, fname):
+    """
+    store tile sample object as hdf5 object
+    """
     hf = h5py.File(fname + '.h5', 'w')
     g1 = hf.create_group('gene_arrays')
     for gene, gene_array in sample.gene_arrays.items():
@@ -94,6 +139,9 @@ def sample_to_hdf5(sample, fname):
     hf.close()
 
 def hdf5_to_sample(fname):
+    """
+    load tile sample object from hdf5
+    """
     sample = TileSample()
     hf = h5py.File(fname, 'r')
     for i,v in hf['gene_arrays'].items():
@@ -107,9 +155,10 @@ def hdf5_to_sample(fname):
 
 # ranges = load_ranges()
 # sample = TileSample()
-# sample.generate_sample(ranges)
+# sample.generate_sample(ranges, sample_type = 'responder', tumor_size =20)
+# # sample_to_hdf5(sample, 'responder1')
+# gene_arrays, fig = plot_gene_heatmaps(sample, standardize = False)
+# # plt.savefig('gene_sample_responder2')
+# fig.show()
 #
 # sample = hdf5_to_sample('data.h5')
-# fig = plot_gene_heatmaps(sample, standardize = False)
-# #plt.savefig('gene_sample_responder_standardized')
-# fig.show()

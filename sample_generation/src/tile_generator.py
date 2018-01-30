@@ -22,6 +22,7 @@ class TileSample:
         """
         self.sample_type = None
         self.sample_info = defaultdict(list)
+        self.sample_info['tumor_size'] =None
         self.tumor_region = None
         self.gene_arrays = pd.Series()
         self.ranges = None
