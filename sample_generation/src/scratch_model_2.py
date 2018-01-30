@@ -114,7 +114,7 @@ def check_binary(X, y, n_genes=48):
 def check_3_classes(X, y, n_genes=48):
     X_train, X_test, y_train, y_test = get_train_test(X, y)#, exclude = None)
     model = keras_script.test_model(n_classes = 3, input_shape = (9,10,n_genes))
-    model.fit(X_train, y_train, batch_size=32, nb_epoch=5, verbose=1)
+    model.fit(X_train, y_train, batch_size=32, nb_epoch=10, verbose=1)
     model_dict = defaultdict(dict)
     loss, accuracy = model.evaluate(X_test,y_test)
     model_dict['model'] = model
@@ -127,23 +127,29 @@ def check_3_classes(X, y, n_genes=48):
     return model_dict
 
 
+# gene_list = all_gene_cols
+# custom_query = "WHERE index > 20000 AND signal_purity = 1"
+# n_samples = 20000
+# query_result = get_sample_set(format_col_list(gene_list), n_samples=n_samples, custom_query=custom_query)
+# df, X, y = format_sample_set(query_result, gene_list, n_samples)
+# b_48 = check_binary(X, y, n_genes=len(gene_list))
+# model_48 = check_3_classes(X, y, n_genes=len(gene_list))
+#
+#
+# gene_list = get_interest_genes()
+# custom_query = "WHERE index > 20000 AND signal_purity = 1"
+# n_samples = 20000
+# query_result = get_sample_set(format_col_list(gene_list), n_samples=n_samples, custom_query=custom_query)
+# df, X, y = format_sample_set(query_result, gene_list, n_samples)
+# b_13 = check_binary(X, y, n_genes=len(gene_list))
+# model_13 = check_3_classes(X, y, n_genes=len(gene_list))
+
+
 gene_list = all_gene_cols
-custom_query = "WHERE index > 20000 AND signal_purity = 1"
-n_samples = 20000
+custom_query = "WHERE index > 20000"
+n_samples = 100000
 query_result = get_sample_set(format_col_list(gene_list), n_samples=n_samples, custom_query=custom_query)
 df, X, y = format_sample_set(query_result, gene_list, n_samples)
-b_48 = check_binary(X, y, n_genes=len(gene_list))
-model_48 = check_3_classes(X, y, n_genes=len(gene_list))
-
-
-gene_list = get_interest_genes()
-custom_query = "WHERE index > 20000 AND signal_purity = 1"
-n_samples = 20000
-query_result = get_sample_set(format_col_list(gene_list), n_samples=n_samples, custom_query=custom_query)
-df, X, y = format_sample_set(query_result, gene_list, n_samples)
-b_13 = check_binary(X, y, n_genes=len(gene_list))
-model_13 = check_3_classes(X, y, n_genes=len(gene_list))
-
 
 sig = get_interest_genes()
 nosig_ix = [ix for ix, v in enumerate(all_gene_cols) if v not in sig]
@@ -157,7 +163,16 @@ for i in range(0, len(all_gene_cols)-len(sig)):
     models[i] = model_
     gene_list = gene_list + [str(all_gene_cols[nosig_ix[i]])]
 
-
-
+results = pd.DataFrame()
 for k, v in models.items():
-    v['model'].evaluate(v['X_test'], v['y_test'])
+    temp = pd.Series({'n_extra': k,
+        'accuracy': v['accuracy'],
+        'loss': v['loss'],
+        'params': v['model'].count_params()})
+    results = results.append(temp, ignore_index = True)
+
+results.to_csv('results.csv')
+# #
+# #
+# for k, v in models.items():
+#     v['model'].evaluate(v['X_test'], v['y_test'])
