@@ -203,7 +203,7 @@ if __name__=='__main__':
     gene_list = all_gene_cols
     custom_query = "WHERE index > 20000"
     n_samples = 100000
-    query_result = get_sample_set(format_col_list(gene_list), n_samples=n_samples, custom_query=custom_query, aws = False)
+    query_result = get_sample_set(format_col_list(gene_list), n_samples=n_samples, custom_query=custom_query, aws = True)
     df, X, y = format_sample_set(query_result, gene_list, n_samples)
     #df.to_pickle('data.p')
     #np.save("X_5", X)
