@@ -166,19 +166,21 @@ def define_model(n_genes, n_classes = 3):
     model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
     return model
 
-X = np.load("X.npy")
-y = np.load("y.npy")
-X_train, X_test, Y_train, Y_test = get_train_test_import(X, y, multichannel = True)
-sig = get_interest_genes()
-nosig_ix = [ix for ix, v in enumerate(all_gene_cols) if v not in sig]
-sig_ix = [ix for ix, v in enumerate(all_gene_cols) if v in sig]
-n_genes = len(X_train)
-n_classes = 3
-#X_train= [X[:,:,:,i].reshape(20000,9,10,1) for i in sig_ix[:n_genes]]
-#Y_train = np_utils.to_categorical(y, n_classes)
-model = define_model(n_genes, n_classes)
-model.fit(X_train, Y_train, epochs=5, batch_size=16)
-model.save('multichannelmodel.h5')
+
+# X = np.load("X.npy")
+# y = np.load("y.npy")
+# X_train, X_test, Y_train, Y_test = get_train_test_import(X, y, multichannel = True)
+# sig = get_interest_genes()
+# nosig_ix = [ix for ix, v in enumerate(all_gene_cols) if v not in sig]
+# sig_ix = [ix for ix, v in enumerate(all_gene_cols) if v in sig]
+# n_genes = len(X_train)
+# n_classes = 3
+# #X_train= [X[:,:,:,i].reshape(20000,9,10,1) for i in sig_ix[:n_genes]]
+# #Y_train = np_utils.to_categorical(y, n_classes)
+# model = define_model(n_genes, n_classes)
+# model.fit(X_train, Y_train, epochs=5, batch_size=16)
+# model.save('multichannelmodel.h5')
+
 # gene_list = all_gene_cols
 # custom_query = "WHERE index > 20000 AND signal_purity = 1"
 # n_samples = 20000
