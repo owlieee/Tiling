@@ -94,16 +94,39 @@ def get_train_test(X, y, exclude = None):
     Y_test = np_utils.to_categorical(y_test, n_classes)
     return X_train, X_test, Y_train, Y_test
 
-def get_train_test_import(X, y, multichannel = False):
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=42)
+def get_train_test_import(X, y, multichannel = False, train_inds = None, test_inds = None):
+    if train_inds is None:
+        X_train, X_test, Y_train, Y_test = train_test_split(X, y, test_size=0.25, random_state=42)
+    else:
+        X_train = X[train_inds,:,:,:]
+        X_test = X[test_inds,:,:,:]
+        Y_train = y[train_inds]
+        Y_test = y[test_inds]
     X_train /= 40
     X_test /= 40
-    n_classes = len(np.unique(y_train))
+    n_classes = len(np.unique(Y_train))
     if multichannel == True:
         X_train= [X_train[:,:,:,i].reshape(len(X_train),9,10,1) for i in range(0, X_train.shape[-1])]
         X_test= [X_test[:,:,:,i].reshape(len(X_test),9,10,1) for i in range(0, X_test.shape[-1])]
-    Y_train = np_utils.to_categorical(y_train, n_classes)
-    Y_test = np_utils.to_categorical(y_test, n_classes)
+    Y_train = np_utils.to_categorical(Y_train, n_classes)
+    Y_test = np_utils.to_categorical(Y_test, n_classes)
+    return X_train, X_test, Y_train, Y_test
+
+def get_mean_import(X, y, train_inds = None, test_inds = None):
+    if train_inds is None:
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=42)
+    else:
+        X_train = X[train_inds,:,:,:]
+        X_test = X[test_inds,:,:,:]
+        Y_train = y[train_inds]
+        Y_test = y[test_inds]
+    X_train /= 40
+    X_test /= 40
+    n_classes = len(np.unique(Y_train))
+    X_train= np.mean(X_train, axis = (1,2))
+    X_test= np.mean(X_test, axis = (1,2))
+    Y_train = np_utils.to_categorical(Y_train, n_classes)
+    Y_test = np_utils.to_categorical(Y_test, n_classes)
     return X_train, X_test, Y_train, Y_test
 
 def check_binary(X, y, n_genes=48):
@@ -167,48 +190,77 @@ def define_model(n_genes, n_classes = 3):
     model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
     return model
 
+def one_d_model(n_genes, n_classes = 3):
+    from keras.layers.convolutional import Conv1D
+    from keras.layers.convolutional import MaxPooling1D
+    from keras.models import Sequential
+    from keras.layers import Dense
+    from keras.regularizers import l2
+    model1d = Sequential()
+    #model1d.add(Dense(128, activation='relu', input_shape=(48,)))
+    model1d.add(Dense(units=3, activation='sigmoid', input_shape=(48,), kernel_regularizer=l2(0.)))
+    model1d.compile(loss='binary_crossentropy', optimizer='sgd', metrics=['accuracy'])
+    return model1d
+
+def get_train_test_inds(df):
+    np.random.seed(1)
+    inds = np.array(df.index)
+    np.random.shuffle(inds)
+    split_ind  =np.round(len(df)*.75)
+    train_inds = inds[0:split_ind]
+    test_inds = inds[split_ind:]
+    return train_inds, test_inds
+
+def make_results_df(df, model, X_train, X_test, name):
+    results = df.copy()
+    pred = model.predict(X_train, verbose = True)
+    pred = pred.argmax(axis=1)
+    pred_test = model.predict(X_test, verbose = True)
+    pred_test = pred_test.argmax(axis=1)
+    results[name] = np.nan
+    results.loc[train_inds,name]=pred
+    results.loc[test_inds, name]=pred_test
+    results['actual'] = results['sample_type'].map(type_map)
+    return results
 
 # X = np.load("X.npy")
 # y = np.load("y.npy")
-# X_train, X_test, Y_train, Y_test = get_train_test_import(X, y, multichannel = True)
-# sig = get_interest_genes()
-# nosig_ix = [ix for ix, v in enumerate(all_gene_cols) if v not in sig]
-# sig_ix = [ix for ix, v in enumerate(all_gene_cols) if v in sig]
-# n_genes = len(X_train)
-# n_classes = 3
-# #X_train= [X[:,:,:,i].reshape(20000,9,10,1) for i in sig_ix[:n_genes]]
-# #Y_train = np_utils.to_categorical(y, n_classes)
-# model = define_model(n_genes, n_classes)
-# model.fit(X_train, Y_train, epochs=5, batch_size=16)
-# model.save('multichannelmodel.h5')
 
-# gene_list = all_gene_cols
-# custom_query = "WHERE index > 20000 AND signal_purity = 1"
-# n_samples = 20000
-# query_result = get_sample_set(format_col_list(gene_list), n_samples=n_samples, custom_query=custom_query)
-# df, X, y = format_sample_set(query_result, gene_list, n_samples)
-# b_48 = check_binary(X, y, n_genes=len(gene_list))
-# model_48 = check_3_classes(X, y, n_genes=len(gene_list))
-#
-#
-# gene_list = get_interest_genes()
-# custom_query = "WHERE index > 20000 AND signal_purity = 1"
-# n_samples = 20000
-# query_result = get_sample_set(format_col_list(gene_list), n_samples=n_samples, custom_query=custom_query)
-# df, X, y = format_sample_set(query_result, gene_list, n_samples)
-# b_13 = check_binary(X, y, n_genes=len(gene_list))
-# model_13 = check_3_classes(X, y, n_genes=len(gene_list))
+
+
 
 if __name__=='__main__':
     print("querying")
     gene_list = all_gene_cols
-    custom_query = "WHERE index > 20000"
-    n_samples = 100000
+    #custom_query = "WHERE index < 20000"
+    n_samples = 150000
     query_result = get_sample_set(format_col_list(gene_list), n_samples=n_samples, custom_query=custom_query, aws = True)
     df, X, y = format_sample_set(query_result, gene_list, n_samples)
-    #df.to_pickle('data.p')
-    #np.save("X_5", X)
-    #np.save("y_5", y)
+    # df.to_pickle('data_messy.p')
+    # np.save("X_messy", X)
+    # np.save("y_messy", y)
+
+    train_inds, test_inds = get_train_test_inds(df)
+
+    X_1_train, X_1_test, Y_1_train, Y_1_test = get_mean_import(X, y, train_inds = train_inds, test_inds = test_inds)
+    n_genes = len(X_1_train)
+    model1d = one_d_model(n_genes, n_classes = 3)
+    model1d.fit(X_1_train, Y_1_train, epochs = 100)
+    results = make_results_df(df, model1d, X_1_train, X_1_test, 'pred_1d')
+    model1d.save('aws_averagemodel.h5')
+
+    X_2_train, X_2_test, Y_2_train, Y_2_test = get_train_test_import(X, y, multichannel = True,train_inds = train_inds, test_inds = test_inds)
+    n_genes = len(X_train)
+    n_classes = 3
+    model2d = define_model(n_genes, n_classes)
+    model2d.fit(X_train, Y_train, epochs=5, batch_size=16)
+    results = make_results_df(results, model2d, X_2_train, X_2_test, 'pred_2d')
+    model2d.save('aws_multichannelmodel.h5')
+
+    results.to_csv('aws_tumorsize_results.csv')
+
+
+
     if False:
         print("trying gene sets")
         sig = get_interest_genes()
@@ -233,7 +285,7 @@ if __name__=='__main__':
             results = results.append(temp, ignore_index = True)
 
         results.to_csv('results.csv')
-    else:
+    if False:
         X_train, X_test, Y_train, Y_test = get_train_test_import(X, y, multichannel = True)
         print("trying gene sets multichannel ")
         sig = get_interest_genes()
