@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 from keras.models import Sequential
-from keras.layers import Dense, Dropout, Activation, Flatten
+from keras.layers import Dense, Dropout, Activation, Flatten, Input
 from keras.layers import Convolution2D, MaxPooling2D, ZeroPadding2D
 from keras.utils import np_utils
 from keras.optimizers import SGD
@@ -15,6 +15,8 @@ from keras.utils import np_utils
 from sklearn.model_selection import train_test_split
 #from keras.optimizers import SGD
 from collections import defaultdict
+from keras.models import Model
+from keras.layers.merge import concatenate
 
 all_gene_cols = [ u'ABL1', u'AKT1', u'ALK', u'APC', u'ATM', u'BRAF', u'CDH1', u'CDKN2A', u'CSF1R',
        u'CTNNB1', u'EGFR', u'ERBB2', u'ERBB4', u'FBXW7', u'FGFR1', u'FGFR2',
@@ -44,8 +46,8 @@ def format_col_list(gene_list):
     gene_list = gene_list + meta_cols
     return ", ".join(['"{}"'.format(g) for g in gene_list])
 
-def get_sample_set(gene_string, n_samples=10000, custom_query=''):
-    engine = keras_script.init_connection(aws = True)
+def get_sample_set(gene_string, n_samples=10000, custom_query='', aws = True):
+    engine = keras_script.init_connection(aws = aws)
     connection = engine.connect()
     sql = """SELECT {} FROM test_001.samples {} LIMIT {};""".format(gene_string, custom_query, n_samples)
     query_result = connection.execute(sql)
@@ -92,6 +94,17 @@ def get_train_test(X, y, exclude = None):
     Y_test = np_utils.to_categorical(y_test, n_classes)
     return X_train, X_test, Y_train, Y_test
 
+def get_train_test_import(X, y, multichannel = False):
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=42)
+    X_train /= 40
+    X_test /= 40
+    if multichannel == True:
+        X_train= [X_train[:,:,:,i].reshape(len(X_train),9,10,1) for i in range(0, X_train.shape[-1])]
+        X_test= [X_test[:,:,:,i].reshape(len(X_test),9,10,1) for i in range(0, X_test.shape[-1])]
+    Y_train = np_utils.to_categorical(y_train, n_classes)
+    Y_test = np_utils.to_categorical(y_test, n_classes)
+    return X_train, X_test, Y_train, Y_test
+
 def check_binary(X, y, n_genes=48):
     subsets = {'nr_r': type_map['normal'],
                'nr_n': type_map['responder'],
@@ -126,7 +139,46 @@ def check_3_classes(X, y, n_genes=48):
     model_dict['accuracy'] = accuracy
     return model_dict
 
+def one_gene_input():
+    input_shape = (9,10,1)
+    batch_shape=(None, 9,10,1)
+    inputs = Input(batch_shape=batch_shape)
+    zeropad = ZeroPadding2D(padding = (1,1), data_format = 'channels_last',input_shape=input_shape)(inputs)
+    conv = Convolution2D(32, (3,3), activation = 'relu',data_format = 'channels_last',input_shape=input_shape )(zeropad)
+    conv2 = Convolution2D(32, (3,3), activation = 'relu',data_format = 'channels_last',input_shape=input_shape )(conv)
+    pool = MaxPooling2D(pool_size=(2,2))(conv2)
+    drop = Dropout(0.25)(pool)
+    flat = Flatten()(pool)
+    return inputs, flat
 
+def define_model(n_genes, n_classes = 3):
+    flat_layers = []
+    input_layers = []
+    for i in range(0, n_genes):
+        inputs, flat = one_gene_input()
+        flat_layers.append(flat)
+        input_layers.append(inputs)
+    merged = concatenate(flat_layers)
+	# interpretation
+    dense = Dense(128, activation='relu')(merged)
+    outputs = Dense(n_classes, activation='sigmoid',input_shape = (9,10,1))(dense)
+    model = Model(inputs=input_layers, outputs=outputs)
+    model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
+    return model
+
+X = np.load("X.npy")
+y = np.load("y.npy")
+X_train, X_test, Y_train, Y_test = get_train_test_import(X, y, multichannel = True)
+sig = get_interest_genes()
+nosig_ix = [ix for ix, v in enumerate(all_gene_cols) if v not in sig]
+sig_ix = [ix for ix, v in enumerate(all_gene_cols) if v in sig]
+n_genes = len(X_train)
+n_classes = 3
+#X_train= [X[:,:,:,i].reshape(20000,9,10,1) for i in sig_ix[:n_genes]]
+#Y_train = np_utils.to_categorical(y, n_classes)
+model = define_model(n_genes, n_classes)
+model.fit(X_train, Y_train, epochs=5, batch_size=16)
+model.save('multichannelmodel.h5')
 # gene_list = all_gene_cols
 # custom_query = "WHERE index > 20000 AND signal_purity = 1"
 # n_samples = 20000
@@ -149,32 +201,71 @@ if __name__=='__main__':
     gene_list = all_gene_cols
     custom_query = "WHERE index > 20000"
     n_samples = 100000
-    query_result = get_sample_set(format_col_list(gene_list), n_samples=n_samples, custom_query=custom_query)
+    query_result = get_sample_set(format_col_list(gene_list), n_samples=n_samples, custom_query=custom_query, aws = False)
     df, X, y = format_sample_set(query_result, gene_list, n_samples)
+    #df.to_pickle('data.p')
+    #np.save("X_5", X)
+    #np.save("y_5", y)
+    if False:
+        print("trying gene sets")
+        sig = get_interest_genes()
+        nosig_ix = [ix for ix, v in enumerate(all_gene_cols) if v not in sig]
+        np.random.shuffle(nosig_ix)
+        models = {}
+        gene_list = sig
+        for i in range(0, len(all_gene_cols)-len(sig)):
+            print(i)
+            gene_ix = [ix for ix, v in enumerate(all_gene_cols) if v in gene_list]
+            X_new = X[:,:,:,gene_ix]
+            model_ = check_3_classes(X_new, y, n_genes=len(gene_list))
+            models[i] = model_
+            gene_list = gene_list + [str(all_gene_cols[nosig_ix[i]])]
+        print("saving results")
+        results = pd.DataFrame()
+        for k, v in models.items():
+            temp = pd.Series({'n_extra': k,
+                'accuracy': v['accuracy'],
+                'loss': v['loss'],
+                'params': v['model'].count_params()})
+            results = results.append(temp, ignore_index = True)
 
-    print("trying gene sets")
-    sig = get_interest_genes()
-    nosig_ix = [ix for ix, v in enumerate(all_gene_cols) if v not in sig]
-    np.random.shuffle(nosig_ix)
-    models = {}
-    gene_list = sig
-    for i in range(0, len(all_gene_cols)-len(sig)):
-        print(i)
-        gene_ix = [ix for ix, v in enumerate(all_gene_cols) if v in gene_list]
-        X_new = X[:,:,:,gene_ix]
-        model_ = check_3_classes(X_new, y, n_genes=len(gene_list))
-        models[i] = model_
-        gene_list = gene_list + [str(all_gene_cols[nosig_ix[i]])]
-    print("saving results")
-    results = pd.DataFrame()
-    for k, v in models.items():
-        temp = pd.Series({'n_extra': k,
-            'accuracy': v['accuracy'],
-            'loss': v['loss'],
-            'params': v['model'].count_params()})
-        results = results.append(temp, ignore_index = True)
+        results.to_csv('results.csv')
+    else:
+        X_train, X_test, Y_train, Y_test = get_train_test_import(X, y, multichannel = True)
+        print("trying gene sets multichannel ")
+        sig = get_interest_genes()
+        nosig_ix = [ix for ix, v in enumerate(all_gene_cols) if v not in sig]
+        np.random.shuffle(nosig_ix)
+        models = {}
+        gene_list = sig
+        for i in range(0, len(all_gene_cols)-len(sig)):
+            print(i)
+            gene_ix = [ix for ix, v in enumerate(all_gene_cols) if v in gene_list]
+            new_X_train = [x for ix,  x in enumerate(X_train) if ix in gene_ix]
+            new_X_test = [x for ix,  x in enumerate(X_test) if ix in gene_ix]
+            n_genes = len(new_X_train)
+            n_classes = 3
+            #X_train= [X[:,:,:,i].reshape(20000,9,10,1) for i in sig_ix[:n_genes]]
+            #Y_train = np_utils.to_categorical(y, n_classes)
+            model = define_model(n_genes, n_classes)
+            model.fit(new_X_train, Y_train, epochs=1, batch_size=16)
+            model_dict = defaultdict(dict)
+            loss, accuracy = model.evaluate(new_X_test,Y_test)
+            model_dict['model'] = model
+            model_dict['loss'] = loss
+            model_dict['accuracy'] = accuracy
+            model_dict['params'] = model.count_params()
+            models[i] = model_dict
+        print("saving results")
+        results = pd.DataFrame()
+        for k, v in models.items():
+            temp = pd.Series({'n_extra': k,
+                'accuracy': v['accuracy'],
+                'loss': v['loss'],
+                'params': v['model'].count_params()})
+            results = results.append(temp, ignore_index = True)
 
-    results.to_csv('results.csv')
+        results.to_csv('results_mc.csv')
     # #
     # #
     # for k, v in models.items():

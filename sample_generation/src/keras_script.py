@@ -6,12 +6,13 @@ from keras.layers import Convolution2D, MaxPooling2D, ZeroPadding2D
 from keras.utils import np_utils
 from keras.optimizers import SGD
 from my_classes import DataGenerator
-#import simplejson
+#
 from sqlalchemy import create_engine
 import psycopg2
 
 def init_connection(aws = True):
     if aws == False:
+        import simplejson
         with open('config/config.json') as f:
             conf = simplejson.load(f)
     else:
