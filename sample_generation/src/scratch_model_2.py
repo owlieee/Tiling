@@ -250,7 +250,7 @@ if __name__=='__main__':
             #X_train= [X[:,:,:,i].reshape(20000,9,10,1) for i in sig_ix[:n_genes]]
             #Y_train = np_utils.to_categorical(y, n_classes)
             model = define_model(n_genes, n_classes)
-            model.fit(new_X_train, Y_train, epochs=1, batch_size=16)
+            model.fit(new_X_train, Y_train, epochs=5, batch_size=32)
             model_dict = defaultdict(dict)
             loss, accuracy = model.evaluate(new_X_test,Y_test)
             model_dict['model'] = model
