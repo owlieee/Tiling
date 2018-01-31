@@ -241,15 +241,14 @@ if __name__=='__main__':
         np.random.shuffle(nosig_ix)
         models = {}
         gene_list = sig
+        gene_ix = [ix for ix, v in enumerate(all_gene_cols) if v in gene_list]
         for i in range(0, len(all_gene_cols)-len(sig)):
             print(i)
-            gene_ix = [ix for ix, v in enumerate(all_gene_cols) if v in gene_list]
             new_X_train = [x for ix,  x in enumerate(X_train) if ix in gene_ix]
             new_X_test = [x for ix,  x in enumerate(X_test) if ix in gene_ix]
             n_genes = len(new_X_train)
             n_classes = 3
-            #X_train= [X[:,:,:,i].reshape(20000,9,10,1) for i in sig_ix[:n_genes]]
-            #Y_train = np_utils.to_categorical(y, n_classes)
+            print("# genes", n_genes)
             model = define_model(n_genes, n_classes)
             model.fit(new_X_train, Y_train, epochs=5, batch_size=32)
             model_dict = defaultdict(dict)
@@ -258,14 +257,16 @@ if __name__=='__main__':
             model_dict['loss'] = loss
             model_dict['accuracy'] = accuracy
             model_dict['params'] = model.count_params()
+            print("# params", model.count_params())
             models[i] = model_dict
+            gene_ix = gene_ix + [nosig_ix[i]]
         print("saving results")
         results = pd.DataFrame()
         for k, v in models.items():
             temp = pd.Series({'n_extra': k,
                 'accuracy': v['accuracy'],
                 'loss': v['loss'],
-                'params': v['model'].count_params()})
+                'params': v['params']})
             results = results.append(temp, ignore_index = True)
 
         results.to_csv('results_mc.csv')
