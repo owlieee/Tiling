@@ -197,8 +197,8 @@ def one_d_model(n_genes, n_classes = 3):
     from keras.layers import Dense
     from keras.regularizers import l2
     model1d = Sequential()
-    #model1d.add(Dense(128, activation='relu', input_shape=(48,)))
-    model1d.add(Dense(units=3, activation='sigmoid', input_shape=(48,), kernel_regularizer=l2(0.)))
+    model1d.add(Dense(128, activation='relu', input_shape=(48,)))
+    model1d.add(Dense(units=3, activation='sigmoid', kernel_regularizer=l2(0.)))
     model1d.compile(loss='binary_crossentropy', optimizer='sgd', metrics=['accuracy'])
     return model1d
 
@@ -206,7 +206,7 @@ def get_train_test_inds(df):
     np.random.seed(1)
     inds = np.array(df.index)
     np.random.shuffle(inds)
-    split_ind  =np.round(len(df)*.75)
+    split_ind  =int(len(df)*.75)
     train_inds = inds[0:split_ind]
     test_inds = inds[split_ind:]
     return train_inds, test_inds
@@ -233,6 +233,7 @@ if __name__=='__main__':
     print("querying")
     gene_list = all_gene_cols
     #custom_query = "WHERE index < 20000"
+    custom_query = None
     n_samples = 150000
     query_result = get_sample_set(format_col_list(gene_list), n_samples=n_samples, custom_query=custom_query, aws = True)
     df, X, y = format_sample_set(query_result, gene_list, n_samples)
@@ -241,14 +242,14 @@ if __name__=='__main__':
     # np.save("y_messy", y)
 
     train_inds, test_inds = get_train_test_inds(df)
-
+    print("1d model training...")
     X_1_train, X_1_test, Y_1_train, Y_1_test = get_mean_import(X, y, train_inds = train_inds, test_inds = test_inds)
     n_genes = len(X_1_train)
     model1d = one_d_model(n_genes, n_classes = 3)
     model1d.fit(X_1_train, Y_1_train, epochs = 100)
     results = make_results_df(df, model1d, X_1_train, X_1_test, 'pred_1d')
     model1d.save('aws_averagemodel.h5')
-
+    print("2d model training...")
     X_2_train, X_2_test, Y_2_train, Y_2_test = get_train_test_import(X, y, multichannel = True,train_inds = train_inds, test_inds = test_inds)
     n_genes = len(X_train)
     n_classes = 3
@@ -256,7 +257,7 @@ if __name__=='__main__':
     model2d.fit(X_train, Y_train, epochs=5, batch_size=16)
     results = make_results_df(results, model2d, X_2_train, X_2_test, 'pred_2d')
     model2d.save('aws_multichannelmodel.h5')
-
+    print("saving...")
     results.to_csv('aws_tumorsize_results.csv')
 
 
