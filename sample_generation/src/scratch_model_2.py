@@ -98,6 +98,7 @@ def get_train_test_import(X, y, multichannel = False):
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=42)
     X_train /= 40
     X_test /= 40
+    n_classes = len(np.unique(y_train))
     if multichannel == True:
         X_train= [X_train[:,:,:,i].reshape(len(X_train),9,10,1) for i in range(0, X_train.shape[-1])]
         X_test= [X_test[:,:,:,i].reshape(len(X_test),9,10,1) for i in range(0, X_test.shape[-1])]
