@@ -154,13 +154,24 @@ def hdf5_to_sample(fname):
     return sample
 
 if __name__ == '__main__':
+    #load normal and modified ranges from google docs
     ranges = load_ranges()
+    #initialize sample
     sample = TileSample()
+    #choose any filename
     filename = 'responder_sample'
+    #generate sample:
+    #  sample_type options: 'responder, 'nonresponder', 'normal'
+    #  tumor_size: 0-90, ignored for normal samples
     sample.generate_sample(ranges, sample_type = 'responder', tumor_size =20)
+    #save sample as hdf5 file
     sample_to_hdf5(sample, filename)
-    gene_arrays, fig = plot_gene_heatmaps(sample, standardize = True)
+    #plot sample (heatmaps of each gene)
+    gene_arrays, fig = plot_gene_heatmaps(sample, standardize = False)
+    #save figure
     plt.savefig(filename+'.png')
+    #show figure
     fig.show()
-    ##To load file:
+    #--------------
+    #To load previously saved file:
     #sample = hdf5_to_sample(filename+'.h5')
