@@ -223,6 +223,21 @@ def make_results_df(df, model, X_train, X_test, name):
     results['actual'] = results['sample_type'].map(type_map)
     return results
 
+def plot_results():
+    results['Averaging_accuracy'] = results['pred_1d']==results['actual']
+    results['Tiling_accuracy'] = results['pred_2d']==results['actual']
+    results['tumor_size'] = results['tumor_size'].astype(float)
+    results['tumor_purity'] = np.round(results['tumor_size']/90., 1)
+    results['signal_purity'] = results['signal_purity'].astype(float)
+    fig, ax =plt.subplots()
+    results[results['sample_type']!='normal'].groupby('tumor_purity').mean()[['Averaging_accuracy', 'Tiling_accuracy']].plot(ax = ax)
+    ax.set_title("% Correctly Classified vs. Tumor Purity")
+    plt.savefig('tumor_purity_35k')
+
+    fig, ax =plt.subplots()
+    results[results['signal_purity']>0.4].groupby(np.round(results['signal_purity'], 1)).mean()[['Averaging_accuracy', 'Tiling_accuracy']].plot(ax = ax)
+    ax.set_title("% Correctly Classified vs. Signal Purity")
+    plt.savefig('signal_purity_35k')
 # X = np.load("X.npy")
 # y = np.load("y.npy")
 
@@ -251,10 +266,10 @@ if __name__=='__main__':
     model1d.save('aws_averagemodel.h5')
     print("2d model training...")
     X_2_train, X_2_test, Y_2_train, Y_2_test = get_train_test_import(X, y, multichannel = True,train_inds = train_inds, test_inds = test_inds)
-    n_genes = len(X_train)
+    n_genes = len(X_2_train)
     n_classes = 3
     model2d = define_model(n_genes, n_classes)
-    model2d.fit(X_train, Y_train, epochs=5, batch_size=16)
+    model2d.fit(X_2_train, Y_2_train, epochs=5, batch_size=16)
     results = make_results_df(results, model2d, X_2_train, X_2_test, 'pred_2d')
     model2d.save('aws_multichannelmodel.h5')
     print("saving...")

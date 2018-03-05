@@ -93,7 +93,7 @@ def plot_gene_heatmaps(sample, standardize = False):
             vmax = 5
         gene_arrays.append(gene_array)
         #colormap_r = matplotlib.colors.ListedColormap('RdYlGn')#.reversed()
-        im =ax.imshow( gene_array, cmap = 'gist_heat', interpolation = None, vmin = vmin, vmax = vmax)
+        im =ax.imshow( gene_array, cmap = 'RdYlGn', interpolation = None, vmin = vmin, vmax = vmax)
         for y,x in zip(np.where(sample.tumor_region>0)[0], np.where(sample.tumor_region>0)[1]):
             ax.add_patch(patch(x, y, '///', 'white'))
     fig.suptitle(sample.sample_type +
@@ -153,12 +153,12 @@ def hdf5_to_sample(fname):
     hf.close()
     return sample
 
-# ranges = load_ranges()
-# sample = TileSample()
-# sample.generate_sample(ranges, sample_type = 'responder', tumor_size =20)
-# # sample_to_hdf5(sample, 'responder1')
-# gene_arrays, fig = plot_gene_heatmaps(sample, standardize = False)
-# # plt.savefig('gene_sample_responder2')
-# fig.show()
-#
-# sample = hdf5_to_sample('data.h5')
+if __name__ == '__main__':
+    ranges = load_ranges()
+    sample = TileSample()
+    sample.generate_sample(ranges, sample_type = 'responder', tumor_size =20)
+    sample_to_hdf5(sample, 'responder1')
+    gene_arrays, fig = plot_gene_heatmaps(sample, standardize = True)
+    plt.savefig('gene_sample_responder2')
+    fig.show()
+    sample = hdf5_to_sample('data.h5')
