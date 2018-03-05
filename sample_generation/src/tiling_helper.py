@@ -156,9 +156,11 @@ def hdf5_to_sample(fname):
 if __name__ == '__main__':
     ranges = load_ranges()
     sample = TileSample()
+    filename = 'responder_sample'
     sample.generate_sample(ranges, sample_type = 'responder', tumor_size =20)
-    sample_to_hdf5(sample, 'responder1')
+    sample_to_hdf5(sample, filename)
     gene_arrays, fig = plot_gene_heatmaps(sample, standardize = True)
-    plt.savefig('gene_sample_responder2')
+    plt.savefig(filename+'.png')
     fig.show()
-    sample = hdf5_to_sample('data.h5')
+    ##To load file:
+    #sample = hdf5_to_sample(filename+'.h5')
